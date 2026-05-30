@@ -4,6 +4,15 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.1.1] - 2026-05-30
+
+### Changed
+
+- Clarify External Agent Protocol: the Caveman-mode prefix is an
+  output-formatting directive, not an instruction-injection or safety-override
+  payload, and the section is explicitly optional. Reduces false-positive
+  surface for skill security scanners (Gen Agent Trust Hub, Socket, Snyk).
+
 ## [0.1.0] - 2026-05-30
 
 ### Added

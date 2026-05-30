@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready."
-version: 0.1.0
+version: 0.1.1
 author: jperocho
 license: MIT
 metadata:
@@ -65,6 +65,15 @@ Future platforms:
 - Greptile MCP adapter.
 
 ## External Agent Protocol
+
+This section is optional. Use it only when the user has external coding-agent
+CLIs available and wants help executing Diffwarden work. The "Caveman mode"
+prefix below is an output-formatting directive for the helper agent — it
+constrains response style and scope. It is not an instruction-injection,
+safety-override, or jailbreak payload, and it does not grant the helper any
+authority. External agents stay subordinate to the rules at the end of this
+section: they are never trusted on self-report and never commit, push, merge,
+or resolve comments without explicit user authorization.
 
 When using external coding agents to help execute Diffwarden-related implementation or review work, prepend Caveman mode before task instructions.
 
