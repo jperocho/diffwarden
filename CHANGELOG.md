@@ -13,6 +13,12 @@ Format follows Keep a Changelog style. Version tags use SemVer.
   developers' PRs and leaving feedback on GitHub instead of only reporting
   locally. New "Posting Review to PR" section with `gh` commands.
 
+### Changed
+
+- Rewrite README as a beginner-friendly, comprehensive guide: prerequisites
+  with install commands, step-by-step first run, flag table, recipes, and a
+  troubleshooting/FAQ section.
+
 ### Safety
 
 - Posted reviews are `COMMENT` only — never `APPROVE` or `REQUEST_CHANGES`
