@@ -1,0 +1,40 @@
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs/temp
+*.log
+*.tmp
+*.temp
+.cache/
+tmp/
+temp/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build/dist
+dist/
+build/
+coverage/
+
+# Hermes local runtime
+.hermes/
