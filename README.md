@@ -65,6 +65,8 @@ Useful modes:
 
 - `skills/diffwarden/SKILL.md` — PR review skill/playbook.
 - `CHANGELOG.md` — release notes.
+- `CLAUDE.md` / `AGENTS.md` — agent guidance (`AGENTS.md` symlinks `CLAUDE.md`).
+- `LICENSE` — MIT.
 - `.gitignore` — local/editor/cache exclusions.
 
 ## Version
