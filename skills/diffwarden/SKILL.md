@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready."
-version: 0.1.1
+version: 0.2.0
 author: jperocho
 license: MIT
 metadata:
@@ -51,6 +51,7 @@ Supported now:
 - PR number or URL, optional. If omitted, detect from current branch.
 - `--dry-run`, optional. Plan only; no edits, commits, pushes, or comment resolution.
 - `--no-push`, optional. Local fixes only.
+- `--post-review`, optional. Post findings to the PR as a GitHub review of type `COMMENT` (and optional inline comments). Off by default; requires explicit user authorization each run. Never approves, requests changes, or merges.
 - `--security-focus`, optional. Prioritize auth, input validation, secrets, data loss, SSRF, injection, path traversal, crypto, and logging leaks.
 - `--max-iterations N`, optional. Default `3`; hard max `5` unless the user explicitly asks otherwise.
 
@@ -391,7 +392,7 @@ For each iteration:
 8. Run targeted verification.
 9. Run broader verification if needed.
 10. Inspect diff.
-11. If commit/push authorized, commit/push.
+11. If commit/push authorized, commit/push. If `--post-review` and posting authorized, post a `COMMENT` review with findings.
 12. Re-collect PR evidence after checks complete or when user asks to stop.
 13. If checks are still pending/in progress, report that state explicitly; do not claim merge-ready until required checks reach terminal passing state.
 
@@ -432,6 +433,66 @@ Stale comments:
 
 - Treat as already addressed only after checking current code and latest commit.
 - Do not ignore comments just because they are old.
+
+## Posting Review to PR
+
+Use this when reviewing another developer's PR and the user wants findings
+posted on GitHub instead of only reported locally. This is the primary mode for
+acting as a reviewer on PRs you do not own.
+
+Gate. Post only when both are true:
+
+- `--post-review` was passed, and
+- the user explicitly authorized posting for this run.
+
+Otherwise report locally only (default).
+
+Hard rules:
+
+- Only post reviews of type `COMMENT`. Never `APPROVE`. Never `REQUEST_CHANGES`.
+  Approval and change-request are human merge-gating decisions and are out of scope.
+- Never resolve, dismiss, or edit existing human review threads.
+- Never merge, push to the head branch, or modify the PR's commits when posting a review.
+- Redact secrets/tokens from comment bodies before posting.
+- Use the head SHA captured during evidence collection. If the PR head changed
+  since, stop and re-collect; do not post against a stale commit.
+- Prefix the review body so it is clearly an automated review, e.g.
+  `Diffwarden review (automated — comment only, no approval)`.
+
+Idempotency:
+
+- Before posting, list existing PR review comments and check for prior
+  Diffwarden comments at the same path/line.
+- Do not repost duplicates. Skip resolved points; only add new or changed findings.
+
+Read author and head before posting:
+
+```bash
+gh pr view <PR_NUMBER> --json author,headRefOid,isDraft,state
+gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments --paginate
+```
+
+Post a summary review (comment-only):
+
+```bash
+gh pr review <PR_NUMBER> --comment --body-file diffwarden-review.md
+```
+
+Post a review with inline line comments in one call (event must be `COMMENT`):
+
+```bash
+gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/reviews \
+  -f event='COMMENT' \
+  -f body='Diffwarden review (automated — comment only, no approval). Summary: ...' \
+  -f 'comments[][path]=path/to/file.ext' \
+  -F 'comments[][line]=NN' \
+  -f 'comments[][side]=RIGHT' \
+  -f 'comments[][body]=[P1/security] issue. Evidence: ... Suggested fix: ...'
+```
+
+Each posted finding should carry: severity tag, evidence, and a suggested fix —
+the same content as the local report. Posting is advisory; it does not change
+the PR's merge state.
 
 ## Security-Focused Checklist
 
@@ -550,4 +611,5 @@ Before final answer:
 - [ ] Tests/lints/typechecks run where applicable.
 - [ ] No force-push, auto-merge, or history rewrite.
 - [ ] No human comment resolved without explicit approval.
+- [ ] If a review was posted, it was `COMMENT` only (no approve/request-changes) and authorized.
 - [ ] Final report includes status, findings, verification, changed files, risks, next action.

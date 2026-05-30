@@ -51,6 +51,7 @@ Useful modes:
 - `--dry-run`: collect evidence and plan only.
 - `--no-push`: local fixes only.
 - `--security-focus`: prioritize security-sensitive review.
+- `--post-review`: post findings to the PR as a GitHub `COMMENT` review (and optional inline comments). Off by default; requires explicit authorization. Never approves, requests changes, or merges.
 - `--max-iterations N`: default 3; hard max 5 unless explicitly overridden.
 
 ## Requirements
@@ -71,4 +72,4 @@ Useful modes:
 
 ## Version
 
-Current version: `v0.1.1`
+Current version: `v0.2.0`

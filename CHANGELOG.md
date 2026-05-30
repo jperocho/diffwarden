@@ -4,6 +4,23 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.2.0] - 2026-05-30
+
+### Added
+
+- `--post-review` mode: post findings directly to a PR as a GitHub review of
+  type `COMMENT`, with optional inline line comments. Enables reviewing other
+  developers' PRs and leaving feedback on GitHub instead of only reporting
+  locally. New "Posting Review to PR" section with `gh` commands.
+
+### Safety
+
+- Posted reviews are `COMMENT` only — never `APPROVE` or `REQUEST_CHANGES`
+  (merge-gating decisions stay with humans).
+- Off by default; requires `--post-review` plus explicit per-run authorization.
+- Never resolves/dismisses human threads, merges, or pushes when posting.
+- Posts against the captured head SHA; aborts on stale head. Secrets redacted.
+
 ## [0.1.1] - 2026-05-30
 
 ### Changed
