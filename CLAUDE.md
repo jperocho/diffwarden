@@ -10,8 +10,9 @@ markdown playbook: `skills/diffwarden/SKILL.md`. Everything else documents it.
 No source code, build step, or test suite.
 
 ```
-skills/diffwarden/SKILL.md  ← the product (PR-guardian playbook)
-README.md                   ← user-facing description / install / usage
+skills/diffwarden/SKILL.md     ← the product (PR-guardian playbook)
+skills/diffwarden/commands/    ← Cursor slash files (copy to .cursor/commands/)
+README.md                      ← user-facing description / install / usage
 CHANGELOG.md                ← release notes (Keep a Changelog + SemVer)
 LICENSE                     ← MIT
 CLAUDE.md / AGENTS.md       ← agent guidance (AGENTS.md symlinks CLAUDE.md)

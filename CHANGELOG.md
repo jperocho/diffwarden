@@ -4,6 +4,15 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.7.3] - 2026-06-01
+
+### Added
+
+- Cursor slash command files: `skills/diffwarden/commands/dw.md` and
+  `diffwarden.md` (plus `.cursor/commands/` in this repo). `/dw` and
+  `/diffwarden` now work in Cursor's `/` menu after copying to
+  `.cursor/commands/` or `~/.cursor/commands/`. README install + FAQ updated.
+
 ## [0.7.2] - 2026-06-01
 
 ### Changed

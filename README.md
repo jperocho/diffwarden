@@ -1,7 +1,7 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
-[![version](https://img.shields.io/badge/version-0.7.2-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.7.3-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -11,6 +11,8 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 ## Command reference
 
 Invoke with `/diffwarden` or `/dw`. PR arg: `#123`, `123`, full URL, `current`, or omit (current branch PR). Natural-language prompts still work — see [Slash commands](#slash-commands).
+
+**Cursor `/` menu:** install command files once (see [Install](#install)) so `/dw` and `/diffwarden` appear in the picker. Typing `/dw review` as chat text also works when the skill is loaded.
 
 | Command | What it does |
 |---------|--------------|
@@ -127,6 +129,22 @@ npx skills add https://github.com/jperocho/diffwarden --skill diffwarden
 ```
 
 This drops the skill where your agent can find it automatically.
+
+**Cursor slash menu (`/dw`, `/diffwarden`):** copy command files into your project (or global) commands folder:
+
+```bash
+# project (recommended — team shares via git)
+mkdir -p .cursor/commands
+cp path/to/diffwarden/skills/diffwarden/commands/dw.md .cursor/commands/
+cp path/to/diffwarden/skills/diffwarden/commands/diffwarden.md .cursor/commands/
+
+# or global (all projects on this machine)
+mkdir -p ~/.cursor/commands
+cp path/to/diffwarden/skills/diffwarden/commands/dw.md ~/.cursor/commands/
+cp path/to/diffwarden/skills/diffwarden/commands/diffwarden.md ~/.cursor/commands/
+```
+
+After install, type `/` in Cursor chat → pick `dw` or `diffwarden` → add args (e.g. `review #123`).
 
 **Option B — manual copy.** For agents with a custom skill folder:
 
@@ -278,6 +296,8 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 
 ## Troubleshooting / FAQ
 
+**" `/dw` doesn't show in the `/` menu."** Install `.cursor/commands/dw.md` (see [Install](#install)). Skill-only install does not register Cursor slash commands.
+
 **"It says I'm not authenticated."** Run `gh auth login`, then `gh auth status`
 to confirm. If `GH_TOKEN` is set but stale, unset it (`unset GH_TOKEN
 GITHUB_TOKEN`) and use keyring login instead.
@@ -297,6 +317,8 @@ GITHUB_TOKEN`) and use keyring login instead.
 ## Files
 
 - `skills/diffwarden/SKILL.md` — the skill/playbook (the actual product).
+- `skills/diffwarden/commands/` — Cursor slash command files (`dw.md`, `diffwarden.md`).
+- `.cursor/commands/` — same commands, wired for this repo's Cursor `/` menu.
 - `README.md` — this guide.
 - `CHANGELOG.md` — release notes.
 - `CLAUDE.md` / `AGENTS.md` — agent guidance (`AGENTS.md` symlinks `CLAUDE.md`).
@@ -305,4 +327,4 @@ GITHUB_TOKEN`) and use keyring login instead.
 
 ## Version
 
-Current version: `v0.7.2`
+Current version: `v0.7.3`
