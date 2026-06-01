@@ -4,6 +4,15 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.7.1] - 2026-06-01
+
+### Added
+
+- Safe GitHub token handling in preflight and new "GitHub Authentication"
+  section. Use `GH_TOKEN` / `GITHUB_TOKEN` only when already in the environment
+  (never search files/config). Validate with `gh api user`; if invalid, unset
+  env token and fall back to `gh` keyring login.
+
 ## [0.7.0] - 2026-06-01
 
 ### Added
