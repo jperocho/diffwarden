@@ -4,6 +4,28 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.3.0] - 2026-06-01
+
+### Added
+
+- Confidence Score: a PR-level merge-readiness score from `0` to `5`, computed
+  by Diffwarden from collected evidence each iteration (not self-reported by any
+  external tool). New "Confidence Score" section defines the scale and its
+  safety caps. Reported as `Confidence: N/5` in the final report.
+
+### Changed
+
+- Loop now gates on confidence: merge-ready is declared only at `5/5`. Loop and
+  success-state steps updated to compute and check the score; verification
+  checklist adds confidence items.
+
+### Safety
+
+- Confidence is advisory and a loop gate only. It never lowers a safety bar: a
+  high score does not authorize merge, push, or comment resolution, and
+  unresolved P0/security findings, failing required checks, and pending user
+  decisions cap the score regardless of other passing signals.
+
 ## [0.2.0] - 2026-05-30
 
 ### Added

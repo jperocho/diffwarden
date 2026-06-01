@@ -219,4 +219,4 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 
 ## Version
 
-Current version: `v0.2.0`
+Current version: `v0.3.0`
