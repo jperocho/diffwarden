@@ -1,6 +1,8 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
+[![version](https://img.shields.io/badge/version-0.3.0-blue.svg)](CHANGELOG.md)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
 
@@ -219,4 +221,4 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 
 ## Version
 
-Current version: `v0.2.0`
+Current version: `v0.3.0`

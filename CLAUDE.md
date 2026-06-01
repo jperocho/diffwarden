@@ -31,11 +31,12 @@ CLAUDE.md / AGENTS.md       ← agent guidance (AGENTS.md symlinks CLAUDE.md)
 
 ## Version bumps (do all together)
 
-`version` is duplicated in three places — they must stay in sync:
+`version` is duplicated in four places — they must stay in sync:
 
 1. `skills/diffwarden/SKILL.md` frontmatter `version:`
 2. `README.md` — `Current version: vX.Y.Z`
-3. `CHANGELOG.md` — new `## [X.Y.Z] - YYYY-MM-DD` section
+3. `README.md` — version badge `version-X.Y.Z-blue.svg`
+4. `CHANGELOG.md` — new `## [X.Y.Z] - YYYY-MM-DD` section
 
 Use SemVer. Add a CHANGELOG entry for every user-visible change.
 

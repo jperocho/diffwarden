@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready."
-version: 0.2.0
+version: 0.3.0
 author: jperocho
 license: MIT
 metadata:
@@ -260,6 +260,33 @@ Use this priority order:
 
 Security findings are blocking until fixed, disproven with evidence, or explicitly accepted by the user.
 
+## Confidence Score
+
+After classifying findings each iteration, assign one PR-level merge-readiness
+score from `0` to `5`. This is Diffwarden's own judgment computed from collected
+evidence — never a value self-reported by an external tool or agent. Recompute
+it from current evidence on every iteration.
+
+- `5/5` merge-ready: required checks pass, no actionable findings, no open
+  P0/P1/security issue, description has adequate summary/testing/risk notes.
+- `4/5` minor polish: only P3 or informational findings remain.
+- `3/5` implementation issues: one or more open P2 findings, or a missing
+  targeted test for changed behavior.
+- `2/5` significant bugs: any open P1 finding or any failing required check.
+- `0-1/5` critical problems: any open P0 or unresolved security finding, data
+  loss/auth-bypass risk, or hard build/check failure.
+
+Safety caps override the scale. Regardless of other passing signals:
+
+- Any unresolved P0 or security finding caps the score at `1/5`.
+- Any failing required check caps the score at `2/5`.
+- A "needs user decision" finding caps the score at `3/5` until the user
+  decides.
+
+The score is advisory for ranking and reporting and a gate for the loop. It
+never lowers a safety bar — a high score does not authorize merge, push, or
+comment resolution, and Diffwarden still never auto-merges.
+
 ## Fix Planning Protocol
 
 Before edits, produce a compact fix plan:
@@ -385,8 +412,8 @@ For each iteration:
 1. Run preflight.
 2. Detect PR and current head SHA.
 3. Collect PR evidence.
-4. Classify findings.
-5. Stop if no actionable findings and required checks pass.
+4. Classify findings and compute the confidence score.
+5. Stop if confidence is `5/5` (no actionable findings and required checks pass).
 6. Produce fix plan.
 7. Apply safe scoped fixes.
 8. Run targeted verification.
@@ -407,13 +434,16 @@ Stop immediately when:
 - PR head changes externally mid-loop
 - PR is closed or merged externally
 
-Success state:
+Success state (confidence `5/5`):
 
 - required checks pass
 - no actionable unresolved comments
 - no known P0/P1/security issue
 - PR description has adequate summary/testing/risk notes
 - changed files are scoped and verified
+
+Do not declare merge-ready below `5/5`. Report the current score and the
+findings holding it down instead.
 
 ## Comment Resolution Rules
 
@@ -563,6 +593,7 @@ Reply compactly:
 Diffwarden result.
 
 Status: merge-ready | needs fixes | blocked | user decision needed
+Confidence: N/5 — one-line reason
 PR: <url>
 Iterations: N/M
 
@@ -605,7 +636,8 @@ Before final answer:
 - [ ] Current branch is PR head, not base branch.
 - [ ] Worktree state inspected.
 - [ ] Checks/comments/diff collected.
-- [ ] Findings classified.
+- [ ] Findings classified and confidence score computed from evidence.
+- [ ] Merge-ready declared only at confidence `5/5`.
 - [ ] Fix plan made before edits.
 - [ ] Risk gates respected.
 - [ ] Tests/lints/typechecks run where applicable.
