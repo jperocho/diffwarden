@@ -1,12 +1,30 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
-[![version](https://img.shields.io/badge/version-0.7.4-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.7.5-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
 
 It never auto-merges, never force-pushes, and never weakens your tests or CI to make a check go green.
+
+## Contents
+
+- [Command reference](#command-reference)
+- [Loop until merge-ready (5/5)](#loop-until-merge-ready-55)
+- [What it actually does](#what-it-actually-does)
+- [Is this for me?](#is-this-for-me)
+- [Prerequisites (do this first)](#prerequisites-do-this-first)
+- [Install](#install)
+- [Slash commands](#slash-commands)
+- [Your first run (step by step)](#your-first-run-step-by-step)
+- [Modes / flags](#modes--flags)
+- [Common recipes](#common-recipes)
+- [What it will and won't do](#what-it-will-and-wont-do)
+- [Core loop](#core-loop)
+- [Troubleshooting / FAQ](#troubleshooting--faq)
+- [Files](#files)
+- [Version](#version)
 
 ## Command reference
 
@@ -101,24 +119,6 @@ needs-user-decision → max `3/5` until you decide.
 /dw prepare --max 5
 /dw prepare --max 5 --reply --resolve
 ```
-
-## Contents
-
-- [What it actually does](#what-it-actually-does)
-- [Command reference](#command-reference)
-- [Loop until merge-ready (5/5)](#loop-until-merge-ready-55)
-- [Is this for me?](#is-this-for-me)
-- [Prerequisites (do this first)](#prerequisites-do-this-first)
-- [Install](#install)
-- [Slash commands](#slash-commands)
-- [Your first run (step by step)](#your-first-run-step-by-step)
-- [Modes / flags](#modes--flags)
-- [Common recipes](#common-recipes)
-- [What it will and won't do](#what-it-will-and-wont-do)
-- [Core loop](#core-loop)
-- [Troubleshooting / FAQ](#troubleshooting--faq)
-- [Files](#files)
-- [Version](#version)
 
 ## What it actually does
 
@@ -390,4 +390,4 @@ GITHUB_TOKEN`) and use keyring login instead.
 
 ## Version
 
-Current version: `v0.7.4`
+Current version: `v0.7.5`

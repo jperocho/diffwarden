@@ -4,6 +4,13 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.7.5] - 2026-06-01
+
+### Changed
+
+- README: move Contents before Command reference; reorder TOC to match section
+  order (command reference and loop guide first).
+
 ## [0.7.4] - 2026-06-01
 
 ### Changed
