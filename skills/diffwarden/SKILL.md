@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.6.0
+version: 0.7.0
 author: jperocho
 license: MIT
 metadata:
@@ -18,7 +18,7 @@ Diffwarden is an independent PR guardian. It reviews the current pull request fr
 Core loop:
 
 ```text
-preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply safe fixes -> verify -> optional push -> re-check -> report
+preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply safe fixes -> verify -> optional commit/push -> optional thread replies/resolve -> optional post-review -> re-check -> report
 ```
 
 Default stance: conservative. Diffwarden prepares a PR for merge. It does not auto-merge.
@@ -53,6 +53,8 @@ Supported now:
 - `--dry-run`, optional. Plan only; no edits, commits, pushes, or comment resolution.
 - `--no-push`, optional. Local fixes only.
 - `--post-review`, optional. Post findings to the PR as a GitHub review of type `COMMENT` (and optional inline comments). Off by default; requires explicit user authorization each run. Never approves, requests changes, or merges.
+- `--reply-comments`, optional. Post threaded replies on existing inline review comments after fixes (see Replying to Review Comments). Off by default; requires explicit user authorization each run.
+- `--resolve-replied`, optional. With `--reply-comments`, resolve review threads where reply type is `fixed` or `already-addressed`. Off by default; requires explicit user authorization. Never resolve human threads without both flags and authorization.
 - `--security-focus`, optional. Prioritize auth, input validation, secrets, data loss, SSRF, injection, path traversal, crypto, and logging leaks.
 - `--max-iterations N`, optional. Default `3`; hard max `5` unless the user explicitly asks otherwise.
 - Slash commands `/diffwarden` and `/dw`, optional. See Slash Commands.
@@ -82,7 +84,7 @@ fails or flags contradict each other.
 
 <subcommand>  review | fix | prepare | security | status | help
 <pr>          #123 | 123 | current | https://github.com/owner/repo/pull/N | (omit = current branch PR)
-<flags>       --comment | --security | --push | --max N | --dry-run
+<flags>       --comment | --reply | --resolve | --security | --push | --max N | --dry-run
 ```
 
 Bare `/diffwarden` or `/dw` with no subcommand → same as `help`.
@@ -103,6 +105,8 @@ Bare `/diffwarden` or `/dw` with no subcommand → same as `help`.
 | Slash flag | Skill flag |
 |------------|------------|
 | `--comment` | `--post-review` (requires explicit user authorization before posting) |
+| `--reply` | `--reply-comments` (requires explicit user authorization before posting) |
+| `--resolve` | `--resolve-replied` (requires `--reply` and explicit user authorization) |
 | `--security` | `--security-focus` |
 | `--push` | omit `--no-push` on `fix` only (allows push after verification) |
 | `--max N` | `--max-iterations N` |
@@ -145,6 +149,12 @@ If resolution fails, halt with a `blocked` report; do not guess.
 /diffwarden prepare #123 --comment
 → Use diffwarden on PR <resolved-url> --post-review
 
+/diffwarden fix #123 --reply
+→ Use diffwarden on PR <resolved-url> --no-push --reply-comments
+
+/diffwarden prepare #123 --reply --resolve
+→ Use diffwarden on PR <resolved-url> --reply-comments --resolve-replied
+
 /diffwarden security #123 --comment
 → Use diffwarden on PR <resolved-url> --dry-run --security-focus --post-review
 
@@ -158,7 +168,9 @@ Reject with a one-line reason; suggest the correct command:
 
 | Invalid | Why | Use instead |
 |---------|-----|-------------|
-| `fix … --comment` | Ambiguous: fix vs post-only | `review … --comment` or `prepare … --comment` |
+| `fix … --comment` | Ambiguous: new review vs thread reply | `review … --comment` or `fix … --reply` |
+| `review … --reply` | Review is read-only | `fix … --reply` or `prepare … --reply` |
+| `* --resolve` without `--reply` | Resolve needs a posted reply first | add `--reply` |
 | `review … --push` | Review is read-only | `prepare` |
 | `status … --comment` | Status is snapshot only | `review … --comment` |
 | `prepare … --dry-run` | Contradiction | `review` |
@@ -173,11 +185,16 @@ When subcommand is `help` or the message is bare `/diffwarden` / `/dw`, reply wi
 Diffwarden slash commands (/diffwarden or /dw):
 
   review [<pr>] [--comment] [--security] [--max N]   read-only review (default: no PR comments)
-  fix [<pr>] [--security] [--max N] [--push]         apply fixes locally (default: no push)
-  prepare [<pr>] [--comment] [--security] [--max N]  fix, verify, commit, and push
+  fix [<pr>] [--reply] [--resolve] [--security] [--max N] [--push]
+                                                     apply fixes locally (default: no push)
+  prepare [<pr>] [--comment] [--reply] [--resolve] [--security] [--max N]
+                                                     fix, verify, commit, and push
   security [<pr>] [--comment] [--max N]              security-focused read-only review
   status [<pr>]                                      quick merge-readiness snapshot
   help                                               this message
+
+Flags: --comment = post new review; --reply = reply on existing review threads;
+       --resolve = resolve threads after fixed replies (needs --reply + your OK)
 
 <pr>: #123, 123, current, full PR URL, or omit for current branch PR
 ```
@@ -477,6 +494,9 @@ Will run:
 Will not change:
 - unrelated files
 - public API unless approved
+
+Planned comment replies (if --reply-comments):
+- comment-id / path:line — [type] draft reply
 ```
 
 Rules:
@@ -588,9 +608,11 @@ For each iteration:
 8. Run targeted verification.
 9. Run broader verification if needed.
 10. Inspect diff.
-11. If commit/push authorized, commit/push. If `--post-review` and posting authorized, post a `COMMENT` review with findings.
-12. Re-collect PR evidence after checks complete or when user asks to stop.
-13. If checks are still pending/in progress, report that state explicitly; do not claim merge-ready until required checks reach terminal passing state.
+11. If commit/push authorized, commit/push.
+12. If `--reply-comments` and posting authorized, reply on addressed inline review threads (see Replying to Review Comments). If `--resolve-replied` also authorized, resolve eligible threads.
+13. If `--post-review` and posting authorized, post a `COMMENT` review with findings.
+14. Re-collect PR evidence after checks complete or when user asks to stop.
+15. If checks are still pending/in progress, report that state explicitly; do not claim merge-ready until required checks reach terminal passing state.
 
 Stop immediately when:
 
@@ -606,7 +628,7 @@ Stop immediately when:
 Success state (confidence `5/5`):
 
 - required checks pass
-- no actionable unresolved comments
+- no actionable unresolved comments (each has a reply or is classified already-addressed with evidence)
 - no known P0/P1/security issue
 - PR description has adequate summary/testing/risk notes
 - changed files are scoped and verified
@@ -614,24 +636,154 @@ Success state (confidence `5/5`):
 Do not declare merge-ready below `5/5`. Report the current score and the
 findings holding it down instead.
 
+## Replying to Review Comments
+
+Use when addressing review feedback on a PR you own or are preparing for merge.
+This is distinct from `--post-review` (posting a new review as an external
+reviewer). Thread replies acknowledge existing reviewer comments after fixes.
+
+### Gate
+
+Post replies only when both are true:
+
+- `--reply-comments` was passed, and
+- the user explicitly authorized posting for this run.
+
+Otherwise report planned replies locally only (default).
+
+Resolve threads only when all are true:
+
+- `--reply-comments` and `--resolve-replied` were passed,
+- the user explicitly authorized resolve for this run, and
+- the thread received a `fixed` or `already-addressed` reply in this run.
+
+### Reply taxonomy
+
+Assign one type per inline review comment (or thread). Use in reply body prefix.
+
+| Type | When | Resolve thread? |
+|------|------|-----------------|
+| `fixed` | Code changed this run; comment addressed | Yes, if `--resolve-replied` authorized |
+| `already-addressed` | Fixed in an earlier commit on current head; verify against code | Yes, if `--resolve-replied` authorized |
+| `defer` | Valid but out of scope for this PR; track for follow-up | No |
+| `wontfix` | Disagree or not applicable; explain why | No |
+| `needs-user` | Ambiguous product/API/risk decision; question for reviewer | No |
+
+Map from classification:
+
+- actionable + fixed now → `fixed`
+- already addressed (verified on head) → `already-addressed`
+- informational / optional → skip reply, or `defer` if acknowledgment helps
+- needs user decision → `needs-user` (stop loop; do not resolve)
+- out of PR scope → `defer` or `wontfix`
+
+### Reply body templates
+
+Prefix every posted reply so it is clearly automated:
+
+```text
+Diffwarden (automated reply — [TYPE])
+
+[fixed] Fixed in {short_sha}. {one-line summary}. Verify: `{command}`
+[already-addressed] Addressed in {short_sha}. {evidence: file:line or test}.
+[defer] Deferred — {reason}. Follow-up: {issue/link or "none"}.
+[wontfix] {reason}.
+[needs-user] {question for reviewer}.
+```
+
+Redact secrets/tokens before posting.
+
+### Workflow
+
+After fixes are verified and commit SHA is known (push if authorized):
+
+1. List inline review comments and threads:
+
+   ```bash
+   gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments --paginate
+   ```
+
+2. For GraphQL thread IDs (needed to resolve):
+
+   ```bash
+   gh api graphql -f query='
+   query($owner: String!, $repo: String!, $pr: Int!) {
+     repository(owner: $owner, name: $repo) {
+       pullRequest(number: $pr) {
+         reviewThreads(first: 100) {
+           nodes {
+             id
+             isResolved
+             path
+             line
+             comments(first: 1) { nodes { id body author { login } } }
+           }
+         }
+       }
+     }
+   }' -f owner=OWNER -f repo=REPO -F pr=<PR_NUMBER>
+   ```
+
+3. Match each unaddressed human/bot inline comment to a finding and reply type.
+4. Idempotency: skip if a prior Diffwarden reply exists on the same thread with
+   the same type and commit SHA.
+5. Post threaded reply (REST — use the **root** comment id of the thread):
+
+   ```bash
+   gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments/{COMMENT_ID}/replies \
+     -f body='Diffwarden (automated reply — fixed)
+
+   Fixed in abc1234. Added null check before dereference. Verify: `pytest tests/foo.py -q`'
+   ```
+
+6. If `--resolve-replied` authorized and type is `fixed` or `already-addressed`:
+
+   ```bash
+   gh api graphql -f query='
+   mutation($threadId: ID!) {
+     resolveReviewThread(input: {threadId: $threadId}) {
+       thread { isResolved }
+     }
+   }' -f threadId=THREAD_ID
+   ```
+
+7. Record coverage: replied N/M, resolved R/M, skipped (with reason).
+
+Hard rules:
+
+- Reply on existing threads only — do not use `--post-review` for this.
+- Never resolve threads with `defer`, `wontfix`, or `needs-user` replies.
+- Never resolve human threads unless `--resolve-replied` and explicit user authorization.
+- Bot threads: may resolve with `--resolve-replied` when reply type is `fixed` or
+  `already-addressed` and evidence is cited.
+- If PR head changed since evidence collection, re-collect before posting.
+- Do not edit or delete existing human comments.
+
 ## Comment Resolution Rules
 
-Default: report, do not resolve.
+Default: report, do not resolve. Use Replying to Review Comments when the user
+wants thread replies; use resolve only via `--resolve-replied`.
 
 Bot comments:
 
-- May resolve only if user requested it and evidence proves the fix.
-- Include evidence: commit, file, line, test command.
+- May resolve only if user requested `--resolve-replied` and evidence proves the fix.
+- Include evidence in reply: commit, file, line, test command.
 
 Human comments:
 
 - Do not resolve by default.
-- Only resolve if the user explicitly asks and the fix directly addresses the comment.
+- Reply with `--reply-comments` when authorized; resolve only with
+  `--resolve-replied` and explicit user authorization when fix is verified.
 
 Stale comments:
 
 - Treat as already addressed only after checking current code and latest commit.
-- Do not ignore comments just because they are old.
+- Reply with `already-addressed` and evidence; do not ignore because they are old.
+
+Unreplyable comments:
+
+- General issue comments (not inline) → note in final report; no thread reply API.
+- Outdated diff lines → reply on thread root if thread still open; cite current fix location.
 
 ## Posting Review to PR
 
@@ -650,7 +802,9 @@ Hard rules:
 
 - Only post reviews of type `COMMENT`. Never `APPROVE`. Never `REQUEST_CHANGES`.
   Approval and change-request are human merge-gating decisions and are out of scope.
-- Never resolve, dismiss, or edit existing human review threads.
+- Never resolve, dismiss, or edit existing human review threads **when using
+  `--post-review`** (external reviewer mode). Thread replies and resolve under
+  `--reply-comments` / `--resolve-replied` follow Replying to Review Comments.
 - Never merge, push to the head branch, or modify the PR's commits when posting a review.
 - Redact secrets/tokens from comment bodies before posting.
 - Use the head SHA captured during evidence collection. If the PR head changed
@@ -747,10 +901,11 @@ In dry-run mode:
 - classify findings
 - produce fix plan
 - list verification commands
+- list planned comment replies (if --reply-comments) without posting
 - do not edit files
 - do not commit
 - do not push
-- do not resolve comments
+- do not post thread replies or resolve comments
 
 Use dry-run when risk is unclear or user asks for assessment only.
 
@@ -772,6 +927,11 @@ Findings:
 - Informational: N
 - Already addressed: N
 
+Comment replies:
+- Replied: N/M (fixed: N, already-addressed: N, defer: N, wontfix: N, needs-user: N)
+- Resolved threads: R (only if --resolve-replied authorized)
+- Skipped: N — reason
+
 Verification:
 - PASS `command`
 - FAIL `command` — reason
@@ -790,12 +950,13 @@ Next action:
 
 1. **Trusting bot comments without checking current code.** Always verify against current head.
 2. **Fixing CI by weakening CI.** Never reduce test/lint/security coverage to pass.
-3. **Resolving human comments too aggressively.** Human review is a decision trail; preserve it unless asked.
-4. **Overbuilding beyond PR scope.** Diffwarden is a guardian, not a refactor engine.
-5. **Skipping tests because fix is small.** Run at least a targeted verification when behavior changes.
-6. **Ignoring dirty worktree.** Protect uncommitted user work first.
-7. **Letting loops oscillate.** If the same issue returns, stop and report root cause.
-8. **Believing external agents.** Read files and run commands before declaring success.
+3. **Resolving human comments too aggressively.** Human review is a decision trail; preserve it unless `--resolve-replied` is authorized and reply type is `fixed` or `already-addressed`.
+4. **Replying without evidence.** Every `fixed` reply must cite commit SHA and verification command.
+5. **Overbuilding beyond PR scope.** Diffwarden is a guardian, not a refactor engine.
+6. **Skipping tests because fix is small.** Run at least a targeted verification when behavior changes.
+7. **Ignoring dirty worktree.** Protect uncommitted user work first.
+8. **Letting loops oscillate.** If the same issue returns, stop and report root cause.
+9. **Believing external agents.** Read files and run commands before declaring success.
 
 ## Verification Checklist
 
@@ -814,6 +975,7 @@ Before final answer:
 - [ ] Risk gates respected.
 - [ ] Tests/lints/typechecks run where applicable.
 - [ ] No force-push, auto-merge, or history rewrite.
-- [ ] No human comment resolved without explicit approval.
+- [ ] No human comment resolved without explicit approval and `--resolve-replied`.
+- [ ] If thread replies were posted, each cites type, evidence, and commit SHA where applicable.
 - [ ] If a review was posted, it was `COMMENT` only (no approve/request-changes) and authorized.
 - [ ] Final report includes status, findings, verification, changed files, risks, next action.

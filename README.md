@@ -1,7 +1,7 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
-[![version](https://img.shields.io/badge/version-0.6.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.7.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -112,7 +112,10 @@ Use `/diffwarden` or the alias `/dw`. PR can be `#123`, `123`, `current`, a full
 | `review [<pr>] --comment` | Same as `review`, but posts a `COMMENT`-only GitHub review (needs your OK each run). |
 | `fix [<pr>]` | Fix safe issues locally and verify. **No push.** |
 | `fix [<pr>] --push` | Fix locally, then commit and push when verified. |
+| `fix [<pr>] --reply` | Fix locally, then reply on reviewer comment threads (needs your OK). |
+| `fix [<pr>] --reply --resolve` | Fix + reply + resolve threads marked fixed (needs your OK). |
 | `prepare [<pr>]` | Full PR prep: fix, verify, commit, and push. |
+| `prepare [<pr>] --reply --resolve` | Full prep plus reply and resolve on fixed threads. |
 | `prepare [<pr>] --comment` | Full prep plus post a `COMMENT`-only review. |
 | `security [<pr>]` | Read-only security-focused pass. |
 | `security [<pr>] --comment` | Security pass plus post findings on the PR. |
@@ -123,7 +126,9 @@ Use `/diffwarden` or the alias `/dw`. PR can be `#123`, `123`, `current`, a full
 
 | Flag | Effect |
 |------|--------|
-| `--comment` | Post findings as a GitHub `COMMENT` review (never approve or request changes). |
+| `--comment` | Post findings as a new GitHub `COMMENT` review (never approve or request changes). |
+| `--reply` | Reply on existing reviewer comment threads after fixes (`fixed`, `defer`, `wontfix`, etc.). |
+| `--resolve` | Resolve threads after `fixed` / `already-addressed` replies (requires `--reply` + your OK). |
 | `--security` | Prioritize auth, injection, SSRF, secrets, path traversal, crypto, data loss. |
 | `--max N` | Loop iterations (default `3`, max `5`). |
 | `--dry-run` | On `fix` only: plan without editing (same as `review`). |
@@ -135,6 +140,7 @@ Use `/diffwarden` or the alias `/dw`. PR can be `#123`, `123`, `current`, a full
 /diffwarden review #123 --comment
 /diffwarden fix
 /diffwarden fix #123 --security
+/diffwarden fix #123 --reply --resolve
 /diffwarden prepare #123 --comment
 /dw status
 /dw help
@@ -196,6 +202,8 @@ Add these after the command. Combine freely.
 | `--no-push` | Apply fixes locally but never push them. |
 | `--security-focus` | Prioritize security: auth, injection, SSRF, secrets, path traversal, crypto, data loss. |
 | `--post-review` | Post findings to the PR as a GitHub `COMMENT` review (plus optional inline comments). Off by default; needs your explicit OK each run. Never approves, requests changes, or merges. |
+| `--reply-comments` | Reply on existing inline review threads after fixes. Types: `fixed`, `already-addressed`, `defer`, `wontfix`, `needs-user`. Off by default; needs your OK each run. |
+| `--resolve-replied` | Resolve threads after `fixed` / `already-addressed` replies. Requires `--reply-comments` and explicit OK. |
 | `--max-iterations N` | How many review→fix→verify rounds. Default `3`; hard max `5` unless you say otherwise. |
 
 ## Common recipes
@@ -220,6 +228,14 @@ Posts a `COMMENT`-type review with inline notes. It will **not** approve or requ
 /diffwarden security #123
 ```
 
+**Address review feedback and reply on threads:**
+
+```text
+/diffwarden fix #123 --reply --resolve
+```
+
+Replies on each addressed inline comment (`fixed in abc123…`). Resolves threads only when type is `fixed` or `already-addressed` and you authorized `--resolve`.
+
 **Let it fix safe issues locally, but don't push:**
 
 ```text
@@ -232,6 +248,8 @@ Posts a `COMMENT`-type review with inline notes. It will **not** approve or requ
 
 - Read diffs, checks, and comments.
 - Fix safe, in-scope issues and run tests to verify.
+- Reply on reviewer comment threads (with `--reply-comments` + your OK).
+- Resolve fixed threads (with `--resolve-replied` + your OK).
 - Post comment-only reviews (with `--post-review` + your OK).
 - Commit/push **only** if you ask for full PR preparation.
 
@@ -249,7 +267,7 @@ Posts a `COMMENT`-type review with inline notes. It will **not** approve or requ
 ## Core loop
 
 ```text
-preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply safe fixes -> verify -> optional post/push -> re-check -> report
+preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply safe fixes -> verify -> optional commit/push -> optional thread replies/resolve -> optional post-review -> re-check -> report
 ```
 
 ## Troubleshooting / FAQ
@@ -279,4 +297,4 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 
 ## Version
 
-Current version: `v0.6.0`
+Current version: `v0.7.0`

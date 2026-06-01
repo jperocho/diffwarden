@@ -4,6 +4,17 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.7.0] - 2026-06-01
+
+### Added
+
+- Reviewer comment reply workflow: `--reply-comments` and `--resolve-replied`
+  flags. New "Replying to Review Comments" section in `SKILL.md` with reply
+  taxonomy (`fixed`, `already-addressed`, `defer`, `wontfix`, `needs-user`),
+  body templates, `gh api` reply/resolve commands, idempotency rules, and loop
+  integration. Slash flags: `--reply` and `--resolve`. Final report includes
+  comment-reply coverage.
+
 ## [0.6.0] - 2026-06-01
 
 ### Added
