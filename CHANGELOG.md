@@ -4,6 +4,15 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.7.6] - 2026-06-01
+
+### Changed
+
+- Remove tracked `.cursor/commands/` from repo; add `.cursor/` and `.claude/` to
+  `.gitignore`. Skill stays agent-agnostic; `skills/diffwarden/commands/` remains
+  an optional Cursor-only install. README and SKILL.md clarify Cursor slash menu
+  is optional.
+
 ## [0.7.5] - 2026-06-01
 
 ### Changed

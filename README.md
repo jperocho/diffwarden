@@ -1,7 +1,7 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
-[![version](https://img.shields.io/badge/version-0.7.5-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.7.6-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -30,7 +30,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 Invoke with `/diffwarden` or `/dw`. PR arg: `#123`, `123`, full URL, `current`, or omit (current branch PR). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
-**Cursor `/` menu:** install command files once (see [Install](#install)) so `/dw` and `/diffwarden` appear in the picker. Typing `/dw review` as chat text also works when the skill is loaded.
+**Cursor `/` menu:** optional — install command files once (see [Install](#install)) so `/dw` and `/diffwarden` appear in Cursor's picker. Other agents: type `/dw review` as chat text or use natural language when the skill is loaded.
 
 | Command | What it does |
 |---------|--------------|
@@ -191,9 +191,9 @@ You also need to be inside a git repository that has an open GitHub pull request
 npx skills add https://github.com/jperocho/diffwarden --skill diffwarden
 ```
 
-This drops the skill where your agent can find it automatically.
+This drops the skill where your agent can find it automatically. Works with any agent that loads skills (Claude Code, Copilot CLI, Cursor, OpenCode, etc.).
 
-**Cursor slash menu (`/dw`, `/diffwarden`):** copy command files into your project (or global) commands folder:
+**Optional — Cursor slash menu only (`/dw`, `/diffwarden`):** not required for other agents. Copy command files into your project or global Cursor commands folder:
 
 ```bash
 # project (recommended — team shares via git)
@@ -380,8 +380,7 @@ GITHUB_TOKEN`) and use keyring login instead.
 ## Files
 
 - `skills/diffwarden/SKILL.md` — the skill/playbook (the actual product).
-- `skills/diffwarden/commands/` — Cursor slash command files (`dw.md`, `diffwarden.md`).
-- `.cursor/commands/` — same commands, wired for this repo's Cursor `/` menu.
+- `skills/diffwarden/commands/` — optional Cursor slash files (copy to your project's `.cursor/commands/`).
 - `README.md` — this guide.
 - `CHANGELOG.md` — release notes.
 - `CLAUDE.md` / `AGENTS.md` — agent guidance (`AGENTS.md` symlinks `CLAUDE.md`).
@@ -390,4 +389,4 @@ GITHUB_TOKEN`) and use keyring login instead.
 
 ## Version
 
-Current version: `v0.7.5`
+Current version: `v0.7.6`

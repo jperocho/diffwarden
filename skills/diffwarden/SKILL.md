@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.7.5
+version: 0.7.6
 author: jperocho
 license: MIT
 metadata:
@@ -76,11 +76,10 @@ Diffwarden invocation. Parse the command, expand to the skill flags below, then
 run the full Diffwarden loop. Do not ask the user to rephrase unless parsing
 fails or flags contradict each other.
 
-**Cursor `/` menu:** `/dw` and `/diffwarden` appear only if command files are
-installed (see `commands/dw.md` and `commands/diffwarden.md` in this skill
-directory → copy to `.cursor/commands/` or `~/.cursor/commands/`). Without
-those files, the user can still type `/dw review` as plain chat text when this
-skill is loaded.
+**Cursor `/` menu:** optional Cursor-only step. Copy `skills/diffwarden/commands/*.md`
+to `.cursor/commands/` or `~/.cursor/commands/`. Without those files, the user
+can still type `/dw review` as plain chat text when this skill is loaded. Not
+required for non-Cursor agents.
 
 ### Grammar
 

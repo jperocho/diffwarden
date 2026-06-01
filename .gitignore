@@ -38,3 +38,7 @@ coverage/
 
 # Hermes local runtime
 .hermes/
+
+# Agent IDE local config (not part of the distributable skill)
+.cursor/
+.claude/

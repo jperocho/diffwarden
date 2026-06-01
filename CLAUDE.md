@@ -11,7 +11,7 @@ No source code, build step, or test suite.
 
 ```
 skills/diffwarden/SKILL.md     ← the product (PR-guardian playbook)
-skills/diffwarden/commands/    ← Cursor slash files (copy to .cursor/commands/)
+skills/diffwarden/commands/    ← optional Cursor slash files (user copies locally)
 README.md                      ← user-facing description / install / usage
 CHANGELOG.md                ← release notes (Keep a Changelog + SemVer)
 LICENSE                     ← MIT
