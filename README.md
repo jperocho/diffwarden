@@ -1,7 +1,7 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
-[![version](https://img.shields.io/badge/version-0.7.3-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.7.4-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -40,10 +40,73 @@ Invoke with `/diffwarden` or `/dw`. PR arg: `#123`, `123`, full URL, `current`, 
 | `--max N` | Loop iterations (default `3`, max `5`). |
 | `--dry-run` | On `fix` only: plan without editing (= `review`). |
 
+## Loop until merge-ready (5/5)
+
+Diffwarden loops automatically inside `fix` and `prepare` — no separate loop command.
+Each round: preflight → collect evidence → score confidence → fix safe issues →
+verify → optional commit/push → re-check. Stops at **5/5** or a safety stop.
+
+### Commands
+
+| Goal | Command |
+|------|---------|
+| Loop locally (no push) | `/dw fix --max 5` |
+| Loop + commit + push | `/dw prepare --max 5` |
+| Check score only | `/dw status` |
+| Loop + reply on review threads | `/dw prepare --max 5 --reply --resolve` |
+
+Natural language: `Use diffwarden on the current PR --max-iterations 5`
+
+Default **3** iterations; hard max **5** unless you explicitly ask for more in chat.
+
+### What 5/5 means
+
+All must be true:
+
+- Required CI checks pass
+- No actionable findings remain
+- No open P0/P1/security issue
+- PR description has adequate summary, testing, and risk notes
+- Review comments addressed or classified already-addressed with evidence
+
+Score is recomputed from evidence every iteration. **5/5 does not auto-merge** — you merge.
+
+### Confidence scale (short)
+
+| Score | Meaning |
+|-------|---------|
+| `5/5` | Merge-ready (loop stops) |
+| `4/5` | Only P3 / informational items left |
+| `3/5` | P2 issues or missing targeted test |
+| `2/5` | P1 issue or failing required check |
+| `0-1/5` | P0, security, or hard build failure |
+
+Safety caps: unresolved P0/security → max `1/5`; failing required check → max `2/5`;
+needs-user-decision → max `3/5` until you decide.
+
+### When it stops before 5/5
+
+| Reason | What to do |
+|--------|------------|
+| Hit `--max 5` | Run again: `/dw prepare --max 5` |
+| Needs user decision (API, product, migration…) | Answer in chat, re-run |
+| Same finding repeats | Agent stops — fix root cause manually |
+| CI still pending | Wait for green, then `/dw status` |
+| Dirty unrelated files | Clean worktree or stash first |
+
+### Example workflow
+
+```text
+/dw status
+/dw prepare --max 5
+/dw prepare --max 5 --reply --resolve
+```
+
 ## Contents
 
 - [What it actually does](#what-it-actually-does)
 - [Command reference](#command-reference)
+- [Loop until merge-ready (5/5)](#loop-until-merge-ready-55)
 - [Is this for me?](#is-this-for-me)
 - [Prerequisites (do this first)](#prerequisites-do-this-first)
 - [Install](#install)
@@ -327,4 +390,4 @@ GITHUB_TOKEN`) and use keyring login instead.
 
 ## Version
 
-Current version: `v0.7.3`
+Current version: `v0.7.4`

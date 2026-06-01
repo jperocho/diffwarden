@@ -4,6 +4,13 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.7.4] - 2026-06-01
+
+### Changed
+
+- README: add "Loop until merge-ready (5/5)" section after Command reference
+  (loop commands, confidence scale, stop conditions, example workflow).
+
 ## [0.7.3] - 2026-06-01
 
 ### Added
