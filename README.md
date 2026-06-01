@@ -1,7 +1,7 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
-[![version](https://img.shields.io/badge/version-0.5.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.6.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -14,6 +14,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 - [Is this for me?](#is-this-for-me)
 - [Prerequisites (do this first)](#prerequisites-do-this-first)
 - [Install](#install)
+- [Slash commands](#slash-commands)
 - [Your first run (step by step)](#your-first-run-step-by-step)
 - [Modes / flags](#modes--flags)
 - [Common recipes](#common-recipes)
@@ -101,6 +102,51 @@ cp skills/diffwarden/SKILL.md ~/.config/agent-skills/diffwarden/SKILL.md
 
 **Option C — no skill loader.** Paste the contents of `skills/diffwarden/SKILL.md` into your agent's context before you give it the PR task.
 
+## Slash commands
+
+Use `/diffwarden` or the alias `/dw`. PR can be `#123`, `123`, `current`, a full GitHub PR URL, or omitted (current branch PR).
+
+| Command | What it does |
+|---------|--------------|
+| `review [<pr>]` | Read-only review and fix plan. **No edits, commits, or push.** Default: no PR comments. |
+| `review [<pr>] --comment` | Same as `review`, but posts a `COMMENT`-only GitHub review (needs your OK each run). |
+| `fix [<pr>]` | Fix safe issues locally and verify. **No push.** |
+| `fix [<pr>] --push` | Fix locally, then commit and push when verified. |
+| `prepare [<pr>]` | Full PR prep: fix, verify, commit, and push. |
+| `prepare [<pr>] --comment` | Full prep plus post a `COMMENT`-only review. |
+| `security [<pr>]` | Read-only security-focused pass. |
+| `security [<pr>] --comment` | Security pass plus post findings on the PR. |
+| `status [<pr>]` | Quick merge-readiness snapshot (checks, score, blockers). |
+| `help` | List commands. Bare `/diffwarden` shows help. |
+
+**Flags** (combine on any applicable command):
+
+| Flag | Effect |
+|------|--------|
+| `--comment` | Post findings as a GitHub `COMMENT` review (never approve or request changes). |
+| `--security` | Prioritize auth, injection, SSRF, secrets, path traversal, crypto, data loss. |
+| `--max N` | Loop iterations (default `3`, max `5`). |
+| `--dry-run` | On `fix` only: plan without editing (same as `review`). |
+
+**Examples:**
+
+```text
+/diffwarden review #123
+/diffwarden review #123 --comment
+/diffwarden fix
+/diffwarden fix #123 --security
+/diffwarden prepare #123 --comment
+/dw status
+/dw help
+```
+
+Equivalent natural-language prompts still work:
+
+```text
+Use diffwarden on the current PR --dry-run
+Use diffwarden on PR https://github.com/owner/repo/pull/123 --no-push
+```
+
 ## Your first run (step by step)
 
 1. `cd` into your repo and switch to the PR's branch.
@@ -114,13 +160,25 @@ cp skills/diffwarden/SKILL.md ~/.config/agent-skills/diffwarden/SKILL.md
 3. In your agent, type:
 
    ```text
+   /diffwarden review
+   ```
+
+   Or the long form:
+
+   ```text
    Use diffwarden on the current PR --dry-run
    ```
 
-   `--dry-run` means **review and plan only — change nothing.** Best way to start: zero risk.
+   Both mean **review and plan only — change nothing.** Best way to start: zero risk.
 
 4. Read the report. It lists findings, severity, and a fix plan.
 5. When ready to let it act, drop `--dry-run`:
+
+   ```text
+   /diffwarden fix
+   ```
+
+   Or:
 
    ```text
    Use diffwarden on PR https://github.com/owner/repo/pull/123
@@ -145,13 +203,13 @@ Add these after the command. Combine freely.
 **Review your own PR before merge (safe, read-only):**
 
 ```text
-Use diffwarden on the current PR --dry-run
+/diffwarden review
 ```
 
 **Review a teammate's PR and post comments on GitHub:**
 
 ```text
-Use diffwarden on PR https://github.com/owner/repo/pull/123 --dry-run --post-review
+/diffwarden review #123 --comment
 ```
 
 Posts a `COMMENT`-type review with inline notes. It will **not** approve or request changes — that decision stays yours.
@@ -159,13 +217,13 @@ Posts a `COMMENT`-type review with inline notes. It will **not** approve or requ
 **Security-focused pass:**
 
 ```text
-Use diffwarden on PR 123 --security-focus --dry-run
+/diffwarden security #123
 ```
 
 **Let it fix safe issues locally, but don't push:**
 
 ```text
-Use diffwarden on the current PR --no-push
+/diffwarden fix
 ```
 
 ## What it will and won't do
@@ -221,4 +279,4 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 
 ## Version
 
-Current version: `v0.5.0`
+Current version: `v0.6.0`

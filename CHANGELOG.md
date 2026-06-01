@@ -4,6 +4,16 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.6.0] - 2026-06-01
+
+### Added
+
+- Slash-command invocation: `/diffwarden` and `/dw` with subcommands `review`,
+  `fix`, `prepare`, `security`, `status`, and `help`. New "Slash Commands"
+  section in `SKILL.md` defines grammar, flag mapping, PR resolution, expansion
+  examples, invalid combinations, and help output. README documents the same
+  for users.
+
 ## [0.5.0] - 2026-06-01
 
 ### Changed

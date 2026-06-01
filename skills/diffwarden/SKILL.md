@@ -1,7 +1,7 @@
 ---
 name: diffwarden
-description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready."
-version: 0.5.0
+description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
+version: 0.6.0
 author: jperocho
 license: MIT
 metadata:
@@ -27,6 +27,7 @@ Default stance: conservative. Diffwarden prepares a PR for merge. It does not au
 
 Use Diffwarden when the user asks to:
 
+- invoke a `/diffwarden` or `/dw` slash command (see Slash Commands)
 - check a PR before merge
 - address review feedback
 - fix failing PR checks
@@ -54,6 +55,7 @@ Supported now:
 - `--post-review`, optional. Post findings to the PR as a GitHub review of type `COMMENT` (and optional inline comments). Off by default; requires explicit user authorization each run. Never approves, requests changes, or merges.
 - `--security-focus`, optional. Prioritize auth, input validation, secrets, data loss, SSRF, injection, path traversal, crypto, and logging leaks.
 - `--max-iterations N`, optional. Default `3`; hard max `5` unless the user explicitly asks otherwise.
+- Slash commands `/diffwarden` and `/dw`, optional. See Slash Commands.
 
 Initial platform:
 
@@ -64,6 +66,123 @@ Future platforms:
 - GitLab via `glab`.
 - Perforce via `p4`.
 - Greptile MCP adapter.
+
+## Slash Commands
+
+When the user message starts with `/diffwarden` or `/dw`, treat it as a
+Diffwarden invocation. Parse the command, expand to the skill flags below, then
+run the full Diffwarden loop. Do not ask the user to rephrase unless parsing
+fails or flags contradict each other.
+
+### Grammar
+
+```text
+/diffwarden <subcommand> [<pr>] [flags]
+/dw <subcommand> [<pr>] [flags]
+
+<subcommand>  review | fix | prepare | security | status | help
+<pr>          #123 | 123 | current | https://github.com/owner/repo/pull/N | (omit = current branch PR)
+<flags>       --comment | --security | --push | --max N | --dry-run
+```
+
+Bare `/diffwarden` or `/dw` with no subcommand → same as `help`.
+
+### Subcommands
+
+| Subcommand | Skill flags | Behavior |
+|------------|-------------|----------|
+| `review` | `--dry-run` | Read-only: collect evidence, classify, plan fixes. No edits, commits, push, or comment resolution. |
+| `fix` | `--no-push` | Review → fix safe issues → verify locally. No push unless `--push`. |
+| `prepare` | *(none — full prep authorized)* | Review → fix → verify → commit/push when verified. |
+| `security` | `--dry-run --security-focus` | Read-only security-focused pass. |
+| `status` | `--dry-run` | Quick merge-readiness snapshot: status, confidence score, blocking findings only — no fix plan. |
+| `help` | — | Print the slash-command reference; do not run the loop. |
+
+### Flag mapping
+
+| Slash flag | Skill flag |
+|------------|------------|
+| `--comment` | `--post-review` (requires explicit user authorization before posting) |
+| `--security` | `--security-focus` |
+| `--push` | omit `--no-push` on `fix` only (allows push after verification) |
+| `--max N` | `--max-iterations N` |
+| `--dry-run` | `--dry-run` |
+
+Default iterations: `3`. Hard max: `5` unless the user explicitly overrides in chat.
+
+### PR resolution
+
+1. Full GitHub PR URL → use as-is.
+2. `#123` or `123` → resolve URL:
+
+   ```bash
+   gh pr view 123 --json url -q .url
+   ```
+
+3. `current` or omitted → detect from branch:
+
+   ```bash
+   gh pr view --json url -q .url
+   ```
+
+If resolution fails, halt with a `blocked` report; do not guess.
+
+### Expansion examples
+
+```text
+/diffwarden review #123
+→ Use diffwarden on PR <resolved-url> --dry-run
+
+/diffwarden review #123 --comment
+→ Use diffwarden on PR <resolved-url> --dry-run --post-review
+
+/diffwarden fix
+→ Use diffwarden on the current PR --no-push
+
+/diffwarden fix #123 --security --max 5
+→ Use diffwarden on PR <resolved-url> --no-push --security-focus --max-iterations 5
+
+/diffwarden prepare #123 --comment
+→ Use diffwarden on PR <resolved-url> --post-review
+
+/diffwarden security #123 --comment
+→ Use diffwarden on PR <resolved-url> --dry-run --security-focus --post-review
+
+/diffwarden status
+→ Use diffwarden on the current PR --dry-run. Report status, confidence score, and blocking findings only — no fix plan.
+```
+
+### Invalid combinations
+
+Reject with a one-line reason; suggest the correct command:
+
+| Invalid | Why | Use instead |
+|---------|-----|-------------|
+| `fix … --comment` | Ambiguous: fix vs post-only | `review … --comment` or `prepare … --comment` |
+| `review … --push` | Review is read-only | `prepare` |
+| `status … --comment` | Status is snapshot only | `review … --comment` |
+| `prepare … --dry-run` | Contradiction | `review` |
+| `fix … --push` on a fork PR | Cannot push to fork head | `fix …` (local only) or `review … --comment` |
+| `* --max N` where N > 5 | Hard cap | `--max 5` or ask user to override explicitly |
+
+### Help output
+
+When subcommand is `help` or the message is bare `/diffwarden` / `/dw`, reply with:
+
+```text
+Diffwarden slash commands (/diffwarden or /dw):
+
+  review [<pr>] [--comment] [--security] [--max N]   read-only review (default: no PR comments)
+  fix [<pr>] [--security] [--max N] [--push]         apply fixes locally (default: no push)
+  prepare [<pr>] [--comment] [--security] [--max N]  fix, verify, commit, and push
+  security [<pr>] [--comment] [--max N]              security-focused read-only review
+  status [<pr>]                                      quick merge-readiness snapshot
+  help                                               this message
+
+<pr>: #123, 123, current, full PR URL, or omit for current branch PR
+```
+
+Then stop; do not run the loop.
 
 ## External Agent Protocol
 
@@ -682,6 +801,7 @@ Next action:
 
 Before final answer:
 
+- [ ] If invoked via `/diffwarden` or `/dw`, command parsed and expanded to skill flags before the loop.
 - [ ] Phase 1 preflight gate passed (env); halted on failure.
 - [ ] Phase 2 PR-context gate passed (open/base/head drift); halted on failure.
 - [ ] PR detected and URL reported.
