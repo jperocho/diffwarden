@@ -4,6 +4,21 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.5.0] - 2026-06-01
+
+### Changed
+
+- Split the preflight gate into two phases. Phase 1 (environment) runs first and
+  is unchanged. New Phase 2 (PR-context) runs after PR detection and
+  machine-checks what were previously judgment calls: PR open/not-merged,
+  current branch is not the PR base, and no external head drift since last
+  iteration. Uses a single `gh` fetch with `-q` (no `jq` dependency) and exits
+  non-zero on failure.
+- Only dirty-file *relevance* remains a judgment call (a script can see dirty
+  files but not whether they belong to the fix).
+- Loop step 2 and the verification checklist now require the Phase 2 gate to
+  pass and to halt on failure.
+
 ## [0.4.0] - 2026-06-01
 
 ### Changed

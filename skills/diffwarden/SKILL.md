@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready."
-version: 0.4.0
+version: 0.5.0
 author: jperocho
 license: MIT
 metadata:
@@ -114,12 +114,16 @@ Rules:
 ## Preflight
 
 Preflight is a hard gate, not advice. Run it before any edits and at the start
-of every loop iteration. If any check below fails, **halt immediately**: do not
+of every loop iteration. If any check fails, **halt immediately**: do not
 classify, plan, edit, commit, push, or post. Emit a `blocked` report naming the
 failed check and the exact command output, then stop.
 
-Run this gate script. It exits non-zero on any hard failure so the result is
-machine-checkable, not a judgment call:
+The gate runs in two phases. Phase 1 needs no PR context and runs first. Phase 2
+runs after PR detection (see "GitHub PR Detection") and checks the working tree
+against the live PR. Both exit non-zero on failure so the result is
+machine-checkable, not a judgment call.
+
+### Phase 1 — environment gate
 
 ```bash
 set -u
@@ -147,18 +151,31 @@ echo "preflight ok: branch=$BR head=$HEAD_SHA"
 git status --short
 ```
 
-After the script passes, still confirm these by inspecting its output — they are
-not auto-failed because they need judgment or PR context:
+Phase 1 covers the environment. The PR-context checks (base branch, open state,
+external head drift) are machine-checked in Phase 2 below, once the PR is known.
 
-- branch is not the PR base branch (compare `$BR` to the PR's `baseRefName`)
-- a PR can be detected or a PR number was provided
-- PR is not closed or merged
-- PR head has not changed externally since the last iteration (compare
-  `$HEAD_SHA` and the PR's `headRefOid`)
-- worktree has no unrelated dirty files that may be overwritten
+### Phase 2 — PR-context gate
 
-If any of these fail, halt with a `blocked` report exactly as for a script
-failure.
+Run after PR detection, passing the resolved PR number. Reuses a single `gh`
+fetch; no `jq` dependency:
+
+```bash
+set -u
+PR="$1"   # resolved PR number from detection step
+fail() { echo "PR-GATE FAIL: $*" >&2; exit 1; }
+
+read -r STATE BASE RHEAD < <(gh pr view "$PR" \
+  --json state,baseRefName,headRefOid \
+  -q '[.state, .baseRefName, .headRefOid] | @tsv') || fail "cannot fetch PR $PR"
+
+[ "$STATE" = "OPEN" ] || fail "PR not open: $STATE"                      # closed/merged
+[ "$(git branch --show-current)" != "$BASE" ] || fail "on PR base branch: $BASE"
+[ "$(git rev-parse HEAD)" = "$RHEAD" ] || fail "head drift: local != PR head ($RHEAD)"  # external push
+echo "pr-gate ok: state=$STATE base=$BASE head=$RHEAD"
+```
+
+The only check that stays a judgment call is **dirty-file relevance** — a script
+can see that files are dirty, but not whether they belong to this fix.
 
 Dirty worktree rule:
 
@@ -191,6 +208,9 @@ gh pr view <PR_NUMBER> --json headRefName,baseRefName -q '{head: .headRefName, b
 ```
 
 Never operate directly on the base branch.
+
+Once the PR number is resolved, run the Phase 2 PR-context gate (see Preflight)
+before collecting evidence or editing. Halt on failure.
 
 ## Evidence Collection
 
@@ -439,8 +459,8 @@ Default max iterations: `3`.
 
 For each iteration:
 
-1. Run the preflight gate. If it fails, halt with a `blocked` report; do not continue.
-2. Detect PR and current head SHA.
+1. Run the Phase 1 preflight gate. If it fails, halt with a `blocked` report; do not continue.
+2. Detect PR and current head SHA, then run the Phase 2 PR-context gate. Halt on failure.
 3. Collect PR evidence.
 4. Classify findings and compute the confidence score.
 5. Stop if confidence is `5/5` (no actionable findings and required checks pass).
@@ -662,7 +682,8 @@ Next action:
 
 Before final answer:
 
-- [ ] Preflight gate passed (script exit 0 + judgment checks); halted on failure.
+- [ ] Phase 1 preflight gate passed (env); halted on failure.
+- [ ] Phase 2 PR-context gate passed (open/base/head drift); halted on failure.
 - [ ] PR detected and URL reported.
 - [ ] Current branch is PR head, not base branch.
 - [ ] Worktree state inspected.
