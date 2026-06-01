@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready."
-version: 0.3.0
+version: 0.4.0
 author: jperocho
 license: MIT
 metadata:
@@ -113,31 +113,61 @@ Rules:
 
 ## Preflight
 
-Run before any edits:
+Preflight is a hard gate, not advice. Run it before any edits and at the start
+of every loop iteration. If any check below fails, **halt immediately**: do not
+classify, plan, edit, commit, push, or post. Emit a `blocked` report naming the
+failed check and the exact command output, then stop.
+
+Run this gate script. It exits non-zero on any hard failure so the result is
+machine-checkable, not a judgment call:
 
 ```bash
-git rev-parse --show-toplevel
+set -u
+fail() { echo "PREFLIGHT FAIL: $*" >&2; exit 1; }
+
+# In a git repo?
+git rev-parse --show-toplevel >/dev/null 2>&1 || fail "not inside a git repo"
+
+# GitHub CLI present and authenticated?
+command -v gh >/dev/null 2>&1 || fail "gh CLI not installed"
+gh auth status >/dev/null 2>&1 || fail "gh not authenticated"
+
+# Remote configured?
+git remote -v | grep -q . || fail "no git remote configured"
+
+# Not on a protected/base branch?
+BR="$(git branch --show-current)"
+case "$BR" in
+  main|master|trunk|develop) fail "on protected branch: $BR" ;;
+esac
+
+# Capture state for later staleness checks.
+HEAD_SHA="$(git rev-parse HEAD)"
+echo "preflight ok: branch=$BR head=$HEAD_SHA"
 git status --short
-git branch --show-current
-git remote -v
-command -v gh || true
-gh auth status
 ```
 
-Stop if:
+After the script passes, still confirm these by inspecting its output — they are
+not auto-failed because they need judgment or PR context:
 
-- not inside a git repo
-- GitHub CLI is unavailable or unauthenticated
-- no PR can be detected and no PR number was provided
-- current branch is `main`, `master`, `trunk`, or the PR base branch
-- worktree has unrelated dirty files that may be overwritten
-- PR is closed or merged
-- a human pushed new commits mid-loop and state is stale
+- branch is not the PR base branch (compare `$BR` to the PR's `baseRefName`)
+- a PR can be detected or a PR number was provided
+- PR is not closed or merged
+- PR head has not changed externally since the last iteration (compare
+  `$HEAD_SHA` and the PR's `headRefOid`)
+- worktree has no unrelated dirty files that may be overwritten
+
+If any of these fail, halt with a `blocked` report exactly as for a script
+failure.
 
 Dirty worktree rule:
 
 - If dirty files are unrelated to the PR fix, stop and ask.
 - If dirty files are expected current-task edits, record them before continuing.
+
+Never proceed past a failed gate by "fixing" the environment silently (e.g.
+stashing user changes, switching branches, re-authenticating) without explicit
+user approval.
 
 ## GitHub PR Detection
 
@@ -409,7 +439,7 @@ Default max iterations: `3`.
 
 For each iteration:
 
-1. Run preflight.
+1. Run the preflight gate. If it fails, halt with a `blocked` report; do not continue.
 2. Detect PR and current head SHA.
 3. Collect PR evidence.
 4. Classify findings and compute the confidence score.
@@ -632,6 +662,7 @@ Next action:
 
 Before final answer:
 
+- [ ] Preflight gate passed (script exit 0 + judgment checks); halted on failure.
 - [ ] PR detected and URL reported.
 - [ ] Current branch is PR head, not base branch.
 - [ ] Worktree state inspected.

@@ -4,6 +4,24 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.4.0] - 2026-06-01
+
+### Changed
+
+- Harden Preflight into an enforceable hard gate. Added a copy-paste gate script
+  that exits non-zero on hard failures (no git repo, missing/unauthenticated
+  `gh`, no remote, protected branch) so the result is machine-checkable instead
+  of a judgment call. Judgment checks (base-branch match, PR detected/open,
+  external head change, unrelated dirty files) are listed explicitly and must
+  also halt with a `blocked` report.
+- Loop step 1 and the verification checklist now require the gate to pass and
+  to halt on failure.
+
+### Safety
+
+- Diffwarden must not silently "fix" a failed gate (stash user changes, switch
+  branches, re-authenticate) without explicit user approval.
+
 ## [0.3.0] - 2026-06-01
 
 ### Added
