@@ -4,6 +4,13 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.7.2] - 2026-06-01
+
+### Changed
+
+- README: add "Command reference" section with command and flag tables after the
+  intro overview; dedupe slash-command section to examples only.
+
 ## [0.7.1] - 2026-06-01
 
 ### Added
