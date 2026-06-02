@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.7.6
+version: 0.7.7
 author: jperocho
 license: MIT
 metadata:
@@ -276,16 +276,23 @@ git rev-parse --show-toplevel >/dev/null 2>&1 || fail "not inside a git repo"
 # GitHub CLI present?
 command -v gh >/dev/null 2>&1 || fail "gh CLI not installed"
 
-# Token auth: env only — never search for tokens (see GitHub Authentication).
-if [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; then
+# GitHub auth: gh user login first; env token only if no active user (see GitHub Authentication).
+if gh auth status >/dev/null 2>&1; then
+  if [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; then
+    echo "PREFLIGHT: gh user login active; ignoring GH_TOKEN/GITHUB_TOKEN this session" >&2
+    unset GH_TOKEN GITHUB_TOKEN
+  fi
+  echo "gh auth: user login ok"
+elif [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; then
   if gh api user -q .login >/dev/null 2>&1; then
     echo "gh auth: env token ok"
   else
-    echo "PREFLIGHT: invalid GH_TOKEN/GITHUB_TOKEN; falling back to gh keyring" >&2
     unset GH_TOKEN GITHUB_TOKEN
+    fail "invalid GH_TOKEN/GITHUB_TOKEN and no gh user login (gh auth login)"
   fi
+else
+  fail "gh not authenticated (gh auth login or export GH_TOKEN)"
 fi
-gh auth status >/dev/null 2>&1 || fail "gh not authenticated (gh auth login)"
 
 # Remote configured?
 git remote -v | grep -q . || fail "no git remote configured"
@@ -335,28 +342,31 @@ Dirty worktree rule:
 
 Never proceed past a failed gate by "fixing" the environment silently (e.g.
 stashing user changes, switching branches) without explicit user approval.
-Exception: unsetting an invalid `GH_TOKEN` / `GITHUB_TOKEN` and falling back to
-`gh` keyring login is allowed (see GitHub Authentication).
+Exception: unsetting `GH_TOKEN` / `GITHUB_TOKEN` (invalid token, or to prefer an
+active `gh` user login over env) is allowed (see GitHub Authentication).
 
 ## GitHub Authentication
 
-`gh` honors `GH_TOKEN` and `GITHUB_TOKEN` when set in the environment. Diffwarden
-uses token auth when valid; otherwise falls back to `gh` keyring login (`gh auth
-login`). Never mix invalid token env with keyring silently — validate first.
+`gh` honors `GH_TOKEN` and `GITHUB_TOKEN` when set — they override keyring login.
+Diffwarden prefers `gh auth status` (user/keyring login via `gh auth login`).
+Use env tokens only when no active `gh` user. Never mix invalid env token with
+login silently — validate first.
 
 Rules:
 
-- Use env tokens **only** if already exported in the shell. Do **not** search
-  `.env`, config files, credential stores, git config, or the filesystem for
-  tokens.
+- Prefer `gh auth status` / `gh auth login` for interactive use.
+- Use env tokens **only** when no active `gh` user, and only if already exported
+  in the shell. Do **not** search `.env`, config files, credential stores, git
+  config, or the filesystem for tokens.
+- When user login is active but env tokens are set, `unset GH_TOKEN GITHUB_TOKEN`
+  for the session so `gh` uses the logged-in user (not the env override).
 - Never echo, log, commit, or post token values.
-- Validate before the loop and at the start of each iteration when env tokens
-  are set.
-- If validation fails, `unset GH_TOKEN GITHUB_TOKEN` for the session, note the
-  fallback in the report, then authenticate via keyring.
-- Do not halt solely because `GH_TOKEN` is unset — keyring login is fine.
+- Re-check auth at the start of each loop iteration (same resolution order).
+- If env token validation fails, `unset` both vars and halt with `blocked`; do
+  not fall back to keyring in the same pass unless `gh auth status` succeeds.
+- Do not halt solely because `GH_TOKEN` is unset when `gh auth status` succeeds.
 
-Validate env token (no output on success):
+Validate env token (no output on success; only after step 1 fails):
 
 ```bash
 gh api user -q .login >/dev/null 2>&1
@@ -364,13 +374,15 @@ gh api user -q .login >/dev/null 2>&1
 
 Safe resolution order:
 
-1. If `GH_TOKEN` or `GITHUB_TOKEN` is set → validate with `gh api user`.
-2. Valid → use token auth for all `gh` calls this session.
-3. Invalid → unset both vars, report `invalid env token; using gh keyring`, run
-   `gh auth status`.
-4. If no env token → `gh auth status` only (keyring).
-5. Any failure after step 3/4 → halt with `blocked` report; suggest
-   `gh auth login`.
+1. `gh auth status` — if active user, `unset GH_TOKEN GITHUB_TOKEN` when set,
+   use keyring login for all `gh` calls this session.
+2. If no active user and `GH_TOKEN` or `GITHUB_TOKEN` is set → validate with
+   `gh api user`.
+3. Valid → use env token auth for all `gh` calls this session.
+4. Invalid → unset both vars, halt with `blocked`; suggest `gh auth login` or a
+   valid token for CI.
+5. No active user and no env token → halt with `blocked`; suggest `gh auth login`
+   or export `GH_TOKEN` for automation.
 
 ## GitHub PR Detection
 
@@ -1013,7 +1025,7 @@ Next action:
 Before final answer:
 
 - [ ] If invoked via `/diffwarden` or `/dw`, command parsed and expanded to skill flags before the loop.
-- [ ] GitHub auth resolved: valid env token or keyring login; invalid env token unset (no token search).
+- [ ] GitHub auth resolved: gh user login preferred (env tokens unset when user active); else valid env token; no token search.
 - [ ] Phase 1 preflight gate passed (env); halted on failure.
 - [ ] Phase 2 PR-context gate passed (open/base/head drift); halted on failure.
 - [ ] PR detected and URL reported.

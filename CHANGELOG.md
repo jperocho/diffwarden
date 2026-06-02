@@ -4,6 +4,15 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.7.7] - 2026-06-02
+
+### Changed
+
+- GitHub auth: prefer `gh auth status` (user/keyring login) over
+  `GH_TOKEN`/`GITHUB_TOKEN`. When a user is active, unset env tokens for the
+  session so `gh` does not override keyring. Env tokens are validated only when
+  no active `gh` user (CI/automation fallback). No filesystem token search.
+
 ## [0.7.6] - 2026-06-01
 
 ### Changed

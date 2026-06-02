@@ -1,7 +1,7 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
-[![version](https://img.shields.io/badge/version-0.7.6-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.7.7-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -177,9 +177,11 @@ gh auth status        # should say "Logged in to github.com"
 gh auth login         # run this if it doesn't
 ```
 
-Optional: export `GH_TOKEN` (or `GITHUB_TOKEN`) for CI/automation. Diffwarden
-validates it with `gh api user`; if invalid, it unsets the env var and falls
-back to `gh` keyring login. It never searches files or config for tokens.
+Optional: export `GH_TOKEN` (or `GITHUB_TOKEN`) for CI/automation when `gh auth
+login` is not available. Diffwarden tries `gh auth status` first; if you are
+logged in, it ignores env tokens for that session so `gh` uses your user. With
+no active user, it validates env tokens with `gh api user`. It never searches
+files or config for tokens.
 
 You also need to be inside a git repository that has an open GitHub pull request.
 
@@ -362,8 +364,9 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 **" `/dw` doesn't show in the `/` menu."** Install `.cursor/commands/dw.md` (see [Install](#install)). Skill-only install does not register Cursor slash commands.
 
 **"It says I'm not authenticated."** Run `gh auth login`, then `gh auth status`
-to confirm. If `GH_TOKEN` is set but stale, unset it (`unset GH_TOKEN
-GITHUB_TOKEN`) and use keyring login instead.
+to confirm. For CI with no `gh` user, export a valid `GH_TOKEN`. If you are
+logged in via `gh` but a stale `GH_TOKEN` is set, Diffwarden unsets it so your
+user login wins.
 
 **"It can't find a PR."** Make sure you're on the PR's branch, or pass the number/URL explicitly: `... on PR 123`.
 
@@ -389,4 +392,4 @@ GITHUB_TOKEN`) and use keyring login instead.
 
 ## Version
 
-Current version: `v0.7.6`
+Current version: `v0.7.7`
