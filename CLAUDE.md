@@ -11,7 +11,8 @@ No source code, build step, or test suite.
 
 ```
 skills/diffwarden/SKILL.md     ← the product (PR-guardian playbook)
-skills/diffwarden/commands/    ← optional Cursor slash files (user copies locally)
+skills/diffwarden/commands/    ← optional slash files (/dw, /diffwarden)
+install.sh                     ← installer (detects agents, copies skill + commands)
 README.md                      ← user-facing description / install / usage
 CHANGELOG.md                ← release notes (Keep a Changelog + SemVer)
 LICENSE                     ← MIT
@@ -32,12 +33,14 @@ CLAUDE.md / AGENTS.md       ← agent guidance (AGENTS.md symlinks CLAUDE.md)
 
 ## Version bumps (do all together)
 
-`version` is duplicated in four places — they must stay in sync:
+`version` is duplicated in six places — they must stay in sync:
 
 1. `skills/diffwarden/SKILL.md` frontmatter `version:`
 2. `README.md` — `Current version: vX.Y.Z`
 3. `README.md` — version badge `version-X.Y.Z-blue.svg`
-4. `CHANGELOG.md` — new `## [X.Y.Z] - YYYY-MM-DD` section
+4. `README.md` — installer curl URL `.../diffwarden/vX.Y.Z/install.sh`
+5. `install.sh` — `DEFAULT_REF="vX.Y.Z"`
+6. `CHANGELOG.md` — new `## [X.Y.Z] - YYYY-MM-DD` section
 
 Use SemVer. Add a CHANGELOG entry for every user-visible change.
 
@@ -52,5 +55,15 @@ No automated tests. To "verify" a change:
 
 ## Distribution
 
-Installed via skills.sh: `npx skills add https://github.com/jperocho/diffwarden --skill diffwarden`.
-Path layout `skills/<name>/SKILL.md` is required by the loader — do not move it.
+Installed via `install.sh` (detects Claude Code / Cursor, copies the skill +
+command files) or a manual copy — there is **no** `npx`/skills.sh path (it was
+flaky and has been removed). Do not re-add it without good reason.
+
+The installer pins to a release tag (`DEFAULT_REF` in `install.sh`) and fetches
+from `raw.githubusercontent.com/...` when run outside a clone — **bump
+`DEFAULT_REF` and the README curl URL on every release** so a fresh download
+installs the matching version. The source path `skills/diffwarden/SKILL.md` and
+`skills/diffwarden/commands/` is hard-coded in the installer — don't move it.
+
+Security stance for `install.sh`: keep `set -euo pipefail`, HTTPS-only fetch, no
+`sudo`, and the guard that refuses writes outside `.claude/` and `.cursor/`.

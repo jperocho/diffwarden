@@ -4,6 +4,28 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.10.0] - 2026-06-04
+
+### Added
+
+- `install.sh` — a self-contained installer. Detects which agents are present
+  (Claude Code, Cursor) and at which scope (project / global), then copies the
+  skill into `.../skills/diffwarden/SKILL.md` and the optional `/dw` and
+  `/diffwarden` command files into `.../commands/`. Idempotent (skips files
+  already up to date, diffs and asks before overwriting a changed file). Flags:
+  `--claude`, `--cursor`, `--project`, `--global`, `--dry-run`, `--yes`,
+  `--force`, `--ref`. Security-hardened: `set -euo pipefail`, HTTPS-only fetch
+  pinned to a release tag, no `sudo`, refuses to write outside `.claude/` and
+  `.cursor/`. Runs from a clone with no network, or from a downloaded copy.
+
+### Changed
+
+- **Removed the `npx`/skills.sh install path** — it proved flaky. Install is now
+  the installer (Option A) or a plain manual copy (Option B). README Install
+  section rewritten end to end; skills.sh badge and references dropped.
+- README Command reference, Troubleshooting, Files list, and version badge
+  updated to describe installer-based install instead of the skill loader.
+
 ## [0.9.2] - 2026-06-04
 
 ### Changed
