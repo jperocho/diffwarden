@@ -1,7 +1,7 @@
 # Diffwarden
 
 [![skills.sh](https://skills.sh/b/jperocho/diffwarden)](https://skills.sh/jperocho/diffwarden/diffwarden)
-[![version](https://img.shields.io/badge/version-0.9.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.9.1-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -211,6 +211,36 @@ cp path/to/diffwarden/skills/diffwarden/commands/diffwarden.md ~/.cursor/command
 
 After install, type `/` in Cursor chat → pick `dw` or `diffwarden` → add args (e.g. `review #123`).
 
+**Optional — caveman mode for token savings.** Diffwarden runs long review loops
+(diffs, CI logs, threads), so it pairs well with the [`caveman`](https://github.com/JuliusBrussee/caveman)
+skill, which compresses agent output ~75% with no loss of technical substance. If
+`caveman` is loaded, Diffwarden runs in caveman mode automatically; if not, it prints
+a one-time install tip and continues normally.
+
+Caveman activation differs by agent:
+
+- **Claude Code / Codex / Gemini** — hook-driven, auto-activates per session once installed.
+- **Cursor / Windsurf / Cline / Copilot** — no hook system; activation is a static
+  rule file. For Cursor, install the rule into `.cursor/rules/`:
+
+  ```bash
+  npx skills add JuliusBrussee/caveman -a cursor --with-init
+  ```
+
+  > **Caution for this repo only:** `--with-init` also writes repo-root `AGENTS.md`,
+  > which in this project is a symlink to `CLAUDE.md`. Running it here would modify
+  > project instructions. Instead, copy just the Cursor rule by hand:
+  >
+  > ```bash
+  > mkdir -p .cursor/rules
+  > cp ~/.claude/plugins/marketplaces/caveman/src/rules/caveman-activate.md \
+  >    .cursor/rules/caveman.mdc
+  > echo ".cursor/rules/caveman.mdc" >> .gitignore   # keep out of the distributable
+  > ```
+
+Cursor reads only `.cursor/` and repo-root `AGENTS.md`; it never reads Claude's
+`~/.claude` install, so the two stay isolated.
+
 **Option B — manual copy.** For agents with a custom skill folder:
 
 ```bash
@@ -363,6 +393,11 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 
 **" `/dw` doesn't show in the `/` menu."** Install `.cursor/commands/dw.md` (see [Install](#install)). Skill-only install does not register Cursor slash commands.
 
+**"Caveman mode doesn't activate in Cursor."** Cursor has no hook system, so caveman
+needs a static rule file at `.cursor/rules/caveman.mdc` (see [Install](#install)).
+Check with `ls .cursor/rules/caveman.mdc`. Absent → caveman is inactive and Diffwarden
+shows the install tip instead of compact output.
+
 **"It says I'm not authenticated."** Run `gh auth login`, then `gh auth status`
 to confirm. For CI with no `gh` user, export a valid `GH_TOKEN`. If you are
 logged in via `gh` but a stale `GH_TOKEN` is set, Diffwarden unsets it so your
@@ -392,4 +427,4 @@ user login wins.
 
 ## Version
 
-Current version: `v0.9.0`
+Current version: `v0.9.1`

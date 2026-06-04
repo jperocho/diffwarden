@@ -4,6 +4,19 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.9.1] - 2026-06-04
+
+### Added
+
+- Final report and `status` snapshot now print the Diffwarden version (from the
+  skill frontmatter `version:`) on the first line, so users can see which playbook
+  ran.
+- README: Cursor-specific caveman setup. Documents per-agent caveman activation
+  (hook-driven for Claude Code/Codex/Gemini vs. static `.cursor/rules/` file for
+  Cursor/Windsurf/Cline/Copilot), the `--with-init` symlink caution for this repo
+  (`AGENTS.md` → `CLAUDE.md`), the safe manual rule copy, and a Troubleshooting
+  entry for caveman not activating in Cursor.
+
 ## [0.9.0] - 2026-06-04
 
 ### Added

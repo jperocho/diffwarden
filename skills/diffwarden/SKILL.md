@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.9.0
+version: 0.9.1
 author: jperocho
 license: MIT
 metadata:
@@ -192,7 +192,7 @@ If resolution fails, halt with a `blocked` report; do not guess.
 → Use diffwarden on PR <resolved-url> --dry-run --security-focus --post-review
 
 /diffwarden status
-→ Use diffwarden on the current PR --dry-run. Report status, confidence score, and blocking findings only — no fix plan.
+→ Use diffwarden on the current PR --dry-run. Report Diffwarden version (frontmatter `version:`), status, confidence score, and blocking findings only — no fix plan.
 ```
 
 ### Invalid combinations
@@ -1093,10 +1093,11 @@ Use dry-run when risk is unclear or user asks for assessment only.
 
 ## Final Report Format
 
-Reply compactly:
+Reply compactly. Always print the Diffwarden version (the `version:` value from
+this skill's frontmatter) on the first line so the user knows which playbook ran:
 
 ```text
-Diffwarden result.
+Diffwarden vX.Y.Z result.
 
 Status: merge-ready | needs fixes | blocked | user decision needed
 Confidence: N/5 @ <head-sha> (checks: passing | pending | failing) — one-line reason
