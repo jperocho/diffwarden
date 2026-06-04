@@ -4,14 +4,6 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
-## [0.12.1] - 2026-06-04
-
-### Changed
-
-- Help output now lists `--delegate` in the per-subcommand usage lines for
-  `review`, `fix`, and `prepare`, matching the Flags legend and grammar so the
-  flag is discoverable from the command listing. Docs only; no behavior change.
-
 ## [0.12.0] - 2026-06-04
 
 ### Added
