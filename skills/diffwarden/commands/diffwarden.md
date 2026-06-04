@@ -9,4 +9,6 @@ The user text after this command (if any) is a Diffwarden invocation. Parse per 
 
 Examples: `review`, `review #123 --comment`, `fix --reply --resolve`, `status`.
 
+If the `caveman` skill is loaded, run in caveman mode — see the skill **Caveman Mode** section.
+
 Expand to skill flags, run full Diffwarden loop. Do not rephrase unless parse fails.

@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.8.0
+version: 0.9.0
 author: jperocho
 license: MIT
 metadata:
@@ -22,6 +22,34 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 ```
 
 Default stance: conservative. Diffwarden prepares a PR for merge. It does not auto-merge.
+
+## Caveman Mode (token savings)
+
+Diffwarden is verbose by design: it reads diffs, CI logs, and review threads,
+then loops. The optional `caveman` skill compresses agent output ~75% with no
+loss of technical substance — a good fit for long Diffwarden runs.
+
+At the start of every invocation, check whether the `caveman` skill is
+available (look for a `caveman` / `caveman:caveman` skill, or an active
+"CAVEMAN MODE" session directive):
+
+- **Caveman available** → run Diffwarden in caveman mode: compact, high-signal,
+  bullets over prose. Keep all paths, commands, errors, verification results,
+  risks, and next actions exact. Caveman's own safety carve-outs still apply
+  (security warnings, irreversible-action confirmations, and commits/PRs stay in
+  normal prose).
+- **Caveman not installed** → emit this one-line suggestion once per run, then
+  continue normally:
+
+  ```text
+  Tip: Diffwarden works better with the `caveman` skill — ~75% fewer output
+  tokens on these long review loops. Install the caveman skill/plugin to enable.
+  ```
+
+  Do not block, nag, or repeat the tip. Diffwarden runs fully without caveman.
+
+This is an output-style choice only. It never changes classification, fix
+scope, safety gates, or the loop algorithm.
 
 ## When to Use
 

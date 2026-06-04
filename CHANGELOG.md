@@ -4,6 +4,18 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.9.0] - 2026-06-04
+
+### Added
+
+- Caveman Mode (token savings): at the start of every invocation Diffwarden now
+  checks whether the `caveman` skill is available. If present, it runs in caveman
+  mode (compact, high-signal output) while preserving exact paths, commands,
+  errors, verification results, risks, and next actions, and keeping caveman's
+  safety carve-outs. If caveman is not installed, it emits a one-time suggestion
+  to install it for ~75% output-token savings, then continues normally. Output
+  style only — never changes classification, fix scope, safety gates, or the loop.
+
 ## [0.8.0] - 2026-06-04
 
 ### Added
