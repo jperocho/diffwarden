@@ -22,6 +22,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 - [What it will and won't do](#what-it-will-and-wont-do)
 - [Core loop](#core-loop)
 - [Troubleshooting / FAQ](#troubleshooting--faq)
+- [Contributing](#contributing)
 - [Files](#files)
 - [Version](#version)
 
@@ -457,11 +458,51 @@ user login wins.
 
 **"It stopped early."** It hit a safety stop (dirty worktree, ambiguous risk, head changed, max iterations). Read the report — it says why and what to do next.
 
+## Contributing
+
+Contributions welcome — fork, branch, PR.
+
+```bash
+# 1. Fork on GitHub, then:
+git clone https://github.com/<you>/diffwarden
+cd diffwarden
+git checkout -b my-change
+
+# 2. Make the change. Before pushing, run the same checks CI runs:
+bash -n install.sh          # shell syntax
+shellcheck install.sh       # shell lint
+# if you bumped the version, confirm it matches in every file (see below)
+
+# 3. Push to your fork and open a PR against main.
+git push -u origin my-change
+```
+
+**Branch protection on `main`.** `main` is protected by repository rulesets —
+plan your PR around them:
+
+- **No direct pushes to `main`** — every change lands through a pull request,
+  including the maintainer's. Pushing to `main` is rejected.
+- **1 approving review required** before merge.
+- **CI must pass** (`bash -n` + `shellcheck` on `install.sh`, plus a version-sync
+  check). This is enforced for everyone — the maintainer can't merge red CI.
+- **Squash merge only** — keeps `main` linear. Your PR's commits are squashed
+  into one on merge, so a clean PR title is the commit message.
+- **No force-push, no branch deletion** on `main`.
+
+The maintainer may merge without a second reviewer (solo project) but is still
+held to "PR required" and "CI green" — same as everyone else.
+
+**Touching the skill or its version?** `SKILL.md` is the source of truth; if you
+change it, update `README.md` and `CHANGELOG.md` to match. The version string is
+duplicated across six places and must stay in sync (CI fails otherwise) — see
+[`CLAUDE.md`](CLAUDE.md) for the exact list and the project's editing rules.
+
 ## Files
 
 - `skills/diffwarden/SKILL.md` — the skill/playbook (the actual product).
 - `skills/diffwarden/commands/` — optional `/dw` `/diffwarden` slash files; copy to `.claude/commands/` (Claude Code) or `.cursor/commands/` (Cursor).
 - `install.sh` — installer that detects agents and copies the skill + command files into place.
+- `.github/workflows/ci.yml` — CI: shellchecks `install.sh` and enforces version sync.
 - `README.md` — this guide.
 - `CHANGELOG.md` — release notes.
 - `CLAUDE.md` / `AGENTS.md` — agent guidance (`AGENTS.md` symlinks `CLAUDE.md`).

@@ -33,6 +33,11 @@ Format follows Keep a Changelog style. Version tags use SemVer.
   `--force`, `--ref`. Security-hardened: `set -euo pipefail`, HTTPS-only fetch
   pinned to a release tag, no `sudo`, refuses to write outside `.claude/` and
   `.cursor/`. Runs from a clone with no network, or from a downloaded copy.
+- `.github/workflows/ci.yml` — CI that shellchecks `install.sh` (`bash -n` +
+  `shellcheck`) and enforces version sync across all files. Required on `main`.
+- README **Contributing** section documenting the fork/PR flow and the `main`
+  branch-protection rules (PR required, 1 approval, CI green, squash-only, no
+  direct push / force-push — enforced for everyone, including the maintainer).
 
 ### Changed
 
