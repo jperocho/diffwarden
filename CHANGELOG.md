@@ -21,7 +21,8 @@ Format follows Keep a Changelog style. Version tags use SemVer.
   - **Ancestry guard:** `git merge-base --is-ancestor LAST_HEAD HEAD` (or the PR
     head SHA in review-only mode) forces a full re-pull on any rebase/force-push.
   - **Count probe:** a comment-count mismatch vs the last collection forces a
-    full re-pull, catching added, edited, or deleted comments.
+    full re-pull, catching added or deleted comments (edits don't change the
+    count — see the `updated_at` filter next).
   - Comment deltas filter on `updated_at` (not `created_at`) so edits and
     in-place bot updates are caught, and the diff delta unions in files that
     still carry an open finding.

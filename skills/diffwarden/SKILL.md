@@ -609,8 +609,9 @@ all of these hold (otherwise fall back to a full re-pull and log the reason):
    rebase/amend.
 
 2. **Count probe.** Re-pull the cheap comment counts (always-full above) and
-   compare to the last known total. A mismatch means a comment was added,
-   **edited, or deleted** between iterations → full re-pull. One integer compare,
+   compare to the last known total. A mismatch means a comment was **added or
+   deleted** between iterations → full re-pull (edits don't change the count;
+   they're caught by the `updated_at` delta filter below). One integer compare,
    no bodies downloaded:
 
    ```bash
