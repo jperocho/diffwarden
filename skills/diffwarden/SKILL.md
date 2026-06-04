@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.10.1
+version: 0.10.2
 author: jperocho
 license: MIT
 metadata:
@@ -335,10 +335,8 @@ fi
 # Remote configured?
 git remote -v | grep -q . || fail "no git remote configured"
 
-# Not on a protected/base branch? Only matters when we may edit/commit/push.
-# Review-only runs (review/status/security, any --dry-run, --post-review on a PR
-# you do not own) never touch the tree, so sitting on main is fine — a reviewer
-# on another machine is normally on their default branch.
+# Not on a protected/base branch? Only enforced in local-edit mode
+# (REVIEW_ONLY=0); review-only runs never touch the tree (see Preflight intro).
 REVIEW_ONLY="${REVIEW_ONLY:-0}"
 BR="$(git branch --show-current)"
 if [ "$REVIEW_ONLY" != "1" ]; then
@@ -358,18 +356,14 @@ external head drift) are machine-checked in Phase 2 below, once the PR is known.
 
 ### Phase 2 — PR-context gate
 
-The gate has two modes. **Local-edit mode** (`fix`, `prepare`, or any run that
-may edit, commit, or push the working tree) requires the local checkout to match
-the PR head — local changes are meaningless if they sit on a different commit.
-**Review-only mode** (`review`, `status`, `security`, any `--dry-run` run, and
-`--post-review` on a PR you do not own) never touches the working tree: it reads
-all evidence from the PR head SHA via the API, so it does **not** require the PR
-branch to be checked out locally. Requiring a local checkout there is what makes
-a reviewer on another machine spuriously halt before fetching anything.
+Modes are defined in the Preflight intro above. The Phase-2-specific rule:
+local-edit mode additionally requires the local checkout to match the PR head
+(local changes are meaningless on a different commit), so it checks base-branch
+and head-drift; review-only mode reads all evidence from the PR head SHA via the
+API and skips those local checks.
 
-Set `REVIEW_ONLY=1` for review-only runs, else `REVIEW_ONLY=0`. Run after PR
-detection, passing the resolved PR number. Reuses a single `gh` fetch; no `jq`
-dependency:
+Run after PR detection, passing the resolved PR number. Reuses a single `gh`
+fetch; no `jq` dependency:
 
 ```bash
 set -u
