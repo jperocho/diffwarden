@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.7.7
+version: 0.8.0
 author: jperocho
 license: MIT
 metadata:
@@ -264,6 +264,16 @@ runs after PR detection (see "GitHub PR Detection") and checks the working tree
 against the live PR. Both exit non-zero on failure so the result is
 machine-checkable, not a judgment call.
 
+Both phases honor `REVIEW_ONLY`. Set `REVIEW_ONLY=1` for runs that never touch
+the working tree — `review`, `status`, `security`, any `--dry-run` run, and
+`--post-review` on a PR you do not own. Set `REVIEW_ONLY=0` (default) for
+local-edit runs (`fix`, `prepare`, or anything that may edit/commit/push). In
+review-only mode the gate skips working-tree checks (protected-branch,
+base-branch, head-drift) because the run reads everything from the PR head SHA
+via the API — this is what lets a reviewer on another machine, sitting on their
+own default branch without the PR checked out, review the PR without a spurious
+halt.
+
 ### Phase 1 — environment gate
 
 ```bash
@@ -297,15 +307,21 @@ fi
 # Remote configured?
 git remote -v | grep -q . || fail "no git remote configured"
 
-# Not on a protected/base branch?
+# Not on a protected/base branch? Only matters when we may edit/commit/push.
+# Review-only runs (review/status/security, any --dry-run, --post-review on a PR
+# you do not own) never touch the tree, so sitting on main is fine — a reviewer
+# on another machine is normally on their default branch.
+REVIEW_ONLY="${REVIEW_ONLY:-0}"
 BR="$(git branch --show-current)"
-case "$BR" in
-  main|master|trunk|develop) fail "on protected branch: $BR" ;;
-esac
+if [ "$REVIEW_ONLY" != "1" ]; then
+  case "$BR" in
+    main|master|trunk|develop) fail "on protected branch: $BR" ;;
+  esac
+fi
 
 # Capture state for later staleness checks.
 HEAD_SHA="$(git rev-parse HEAD)"
-echo "preflight ok: branch=$BR head=$HEAD_SHA"
+echo "preflight ok: review_only=$REVIEW_ONLY branch=$BR head=$HEAD_SHA"
 git status --short
 ```
 
@@ -314,23 +330,46 @@ external head drift) are machine-checked in Phase 2 below, once the PR is known.
 
 ### Phase 2 — PR-context gate
 
-Run after PR detection, passing the resolved PR number. Reuses a single `gh`
-fetch; no `jq` dependency:
+The gate has two modes. **Local-edit mode** (`fix`, `prepare`, or any run that
+may edit, commit, or push the working tree) requires the local checkout to match
+the PR head — local changes are meaningless if they sit on a different commit.
+**Review-only mode** (`review`, `status`, `security`, any `--dry-run` run, and
+`--post-review` on a PR you do not own) never touches the working tree: it reads
+all evidence from the PR head SHA via the API, so it does **not** require the PR
+branch to be checked out locally. Requiring a local checkout there is what makes
+a reviewer on another machine spuriously halt before fetching anything.
+
+Set `REVIEW_ONLY=1` for review-only runs, else `REVIEW_ONLY=0`. Run after PR
+detection, passing the resolved PR number. Reuses a single `gh` fetch; no `jq`
+dependency:
 
 ```bash
 set -u
 PR="$1"   # resolved PR number from detection step
+REVIEW_ONLY="${REVIEW_ONLY:-0}"
 fail() { echo "PR-GATE FAIL: $*" >&2; exit 1; }
 
-read -r STATE BASE RHEAD < <(gh pr view "$PR" \
+read -r STATE BASE RHEAD < <(gh pr view "$PR" --repo "$OWNER/$REPO" \
   --json state,baseRefName,headRefOid \
   -q '[.state, .baseRefName, .headRefOid] | @tsv') || fail "cannot fetch PR $PR"
 
 [ "$STATE" = "OPEN" ] || fail "PR not open: $STATE"                      # closed/merged
-[ "$(git branch --show-current)" != "$BASE" ] || fail "on PR base branch: $BASE"
-[ "$(git rev-parse HEAD)" = "$RHEAD" ] || fail "head drift: local != PR head ($RHEAD)"  # external push
-echo "pr-gate ok: state=$STATE base=$BASE head=$RHEAD"
+
+if [ "$REVIEW_ONLY" = "1" ]; then
+  # No local working tree involved. Pin the PR head SHA as the canonical
+  # reference for all evidence collection and posting; skip local checks.
+  echo "pr-gate ok (review-only): state=$STATE base=$BASE head=$RHEAD"
+else
+  [ "$(git branch --show-current)" != "$BASE" ] || fail "on PR base branch: $BASE"
+  [ "$(git rev-parse HEAD)" = "$RHEAD" ] || fail "head drift: local != PR head ($RHEAD)"  # external push
+  echo "pr-gate ok (local-edit): state=$STATE base=$BASE head=$RHEAD"
+fi
 ```
+
+In review-only mode, use `$RHEAD` (the PR head SHA from `gh`) as the reference
+commit for diffs, comment anchoring, and post-review head checks — not local
+`git rev-parse HEAD`. The dirty-worktree rule below applies only to local-edit
+mode; review-only runs ignore working-tree state entirely.
 
 The only check that stays a judgment call is **dirty-file relevance** — a script
 can see that files are dirty, but not whether they belong to this fix.
@@ -386,10 +425,41 @@ Safe resolution order:
 
 ## GitHub PR Detection
 
-If PR number is omitted:
+### Resolve owner/repo explicitly
+
+Do this first, before any `gh api` call. `gh` expands `{owner}`/`{repo}` from the
+*current directory's* default remote — which silently resolves to the wrong repo
+(or none) when the reviewer runs from a different clone, a fork, or a directory
+with multiple/renamed remotes. That is a common cause of "it didn't fetch the
+comments": the API call succeeds against the wrong repo and returns an empty set.
+
+Resolve the canonical base repo (where the PR and its comments live) from the PR
+reference itself, not from the working directory:
 
 ```bash
-gh pr view --json number,url,title,headRefName,baseRefName,headRefOid,isDraft,mergeStateStatus
+# PR_REF = full PR URL, #123, 123, or "current"
+if printf '%s' "$PR_REF" | grep -qE '^https://github.com/[^/]+/[^/]+/pull/[0-9]+'; then
+  SLUG="$(printf '%s' "$PR_REF" | sed -E 's#https://github.com/([^/]+/[^/]+)/pull/[0-9]+.*#\1#')"
+  PR_NUMBER="$(printf '%s' "$PR_REF" | sed -E 's#.*/pull/([0-9]+).*#\1#')"
+else
+  # #123 / 123 / current → resolve slug from the local repo's default remote
+  SLUG="$(gh repo view --json nameWithOwner -q .nameWithOwner)" || { echo "cannot resolve repo"; exit 1; }
+  PR_NUMBER="$(printf '%s' "$PR_REF" | tr -d '#')"   # "current" handled by detection below
+fi
+OWNER="${SLUG%%/*}"; REPO="${SLUG##*/}"
+echo "repo: $OWNER/$REPO  pr: ${PR_NUMBER:-<current-branch>}"
+```
+
+Use `$OWNER/$REPO` for every command below: substitute it for the literal
+`{owner}/{repo}` placeholders in all `gh api repos/{owner}/{repo}/...` calls, and
+pass `--repo "$OWNER/$REPO"` to every `gh pr ...` invocation. Never rely on
+`gh`'s implicit current-directory repo resolution.
+
+If PR number is omitted (detect from current branch — only valid when the local
+checkout *is* the PR branch):
+
+```bash
+gh pr view --repo "$OWNER/$REPO" --json number,url,title,headRefName,baseRefName,headRefOid,isDraft,mergeStateStatus
 ```
 
 If PR number is provided:
@@ -415,12 +485,16 @@ before collecting evidence or editing. Halt on failure.
 Collect read-only signals first:
 
 ```bash
-gh pr diff <PR_NUMBER>
-gh pr checks <PR_NUMBER> --watch=false
-gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments --paginate
-gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments --paginate
-gh pr view <PR_NUMBER> --json number,url,title,body,state,isDraft,author,reviews,comments,files,commits,headRefOid,reviewDecision,statusCheckRollup
+gh pr diff <PR_NUMBER> --repo "$OWNER/$REPO"
+gh pr checks <PR_NUMBER> --repo "$OWNER/$REPO" --watch=false
+gh api repos/$OWNER/$REPO/pulls/<PR_NUMBER>/comments --paginate
+gh api repos/$OWNER/$REPO/issues/<PR_NUMBER>/comments --paginate
+gh pr view <PR_NUMBER> --repo "$OWNER/$REPO" --json number,url,title,body,state,isDraft,author,reviews,comments,files,commits,headRefOid,reviewDecision,statusCheckRollup
 ```
+
+If the comment calls return empty, confirm `$OWNER/$REPO` matches the PR URL
+before concluding there are no comments — an empty result against the wrong repo
+is indistinguishable from a genuinely uncommented PR.
 
 Build this mental model:
 
@@ -515,19 +589,37 @@ score from `0` to `5`. This is Diffwarden's own judgment computed from collected
 evidence — never a value self-reported by an external tool or agent. Recompute
 it from current evidence on every iteration.
 
-- `5/5` merge-ready: required checks pass, no actionable findings, no open
-  P0/P1/security issue, description has adequate summary/testing/risk notes.
+The score is always relative to the exact commit it was computed against. Two
+runs at different head SHAs (or with checks in different states) can legitimately
+produce different scores for the same PR — this is not a contradiction. Always
+stamp the score with the head SHA and check-state it was measured at (see Final
+Report). Never compare a score across runs without comparing their stamps first;
+a stale-head review and a current-head review measure different code.
+
+- `5/5` merge-ready: required checks pass (terminal success), no actionable
+  findings, no open P0/P1/security issue, description has adequate
+  summary/testing/risk notes.
 - `4/5` minor polish: only P3 or informational findings remain.
-- `3/5` implementation issues: one or more open P2 findings, or a missing
-  targeted test for changed behavior.
+- `3/5` implementation issues: one or more open P2 findings, a missing targeted
+  test for changed behavior, or required checks still pending/in-progress with no
+  other blocking finding (see pending rule below).
 - `2/5` significant bugs: any open P1 finding or any failing required check.
 - `0-1/5` critical problems: any open P0 or unresolved security finding, data
   loss/auth-bypass risk, or hard build/check failure.
 
+Pending checks are not failing checks. A required check in a non-terminal state
+(`pending`, `in_progress`, `queued`, `expected`) is unresolved evidence, not a
+failure. Do not score it as a failing check (`2/5`) and do not score it as
+passing (`5/5`). When the only thing holding the PR back is non-terminal checks,
+cap the score at `3/5` and report `checks: pending` explicitly. Re-collect once
+checks reach a terminal state before assigning a final score (see Loop step 15).
+
 Safety caps override the scale. Regardless of other passing signals:
 
 - Any unresolved P0 or security finding caps the score at `1/5`.
-- Any failing required check caps the score at `2/5`.
+- Any failing (terminal-failure) required check caps the score at `2/5`.
+- Any required check in a non-terminal state caps the score at `3/5` until it
+  resolves; never declare `5/5` while a required check is still pending.
 - A "needs user decision" finding caps the score at `3/5` until the user
   decides.
 
@@ -979,7 +1071,7 @@ Reply compactly:
 Diffwarden result.
 
 Status: merge-ready | needs fixes | blocked | user decision needed
-Confidence: N/5 — one-line reason
+Confidence: N/5 @ <head-sha> (checks: passing | pending | failing) — one-line reason
 PR: <url>
 Iterations: N/M
 
@@ -1019,6 +1111,8 @@ Next action:
 7. **Ignoring dirty worktree.** Protect uncommitted user work first.
 8. **Letting loops oscillate.** If the same issue returns, stop and report root cause.
 9. **Believing external agents.** Read files and run commands before declaring success.
+10. **Empty comment fetch = no comments.** A `gh api` call against the wrong repo (implicit cwd resolution, fork, renamed remote) returns an empty set that looks identical to a genuinely uncommented PR. Resolve `OWNER/REPO` from the PR reference and confirm it before trusting an empty result.
+11. **Halting a review because the PR branch is not checked out.** Reviewing another developer's PR does not require a local checkout. Use review-only mode: pin the PR head SHA and read evidence via the API; do not fail the head-drift gate.
 
 ## Verification Checklist
 
@@ -1027,13 +1121,14 @@ Before final answer:
 - [ ] If invoked via `/diffwarden` or `/dw`, command parsed and expanded to skill flags before the loop.
 - [ ] GitHub auth resolved: gh user login preferred (env tokens unset when user active); else valid env token; no token search.
 - [ ] Phase 1 preflight gate passed (env); halted on failure.
-- [ ] Phase 2 PR-context gate passed (open/base/head drift); halted on failure.
+- [ ] `OWNER/REPO` resolved from the PR reference (not implicit cwd repo); substituted into all `gh api`/`gh pr` calls.
+- [ ] Phase 2 PR-context gate passed; halted on failure. Local-edit mode checked base/head drift; review-only mode pinned PR head SHA and skipped local checkout checks.
 - [ ] PR detected and URL reported.
-- [ ] Current branch is PR head, not base branch.
-- [ ] Worktree state inspected.
-- [ ] Checks/comments/diff collected.
-- [ ] Findings classified and confidence score computed from evidence.
-- [ ] Merge-ready declared only at confidence `5/5`.
+- [ ] Local-edit mode only: current branch is PR head, not base branch. (Review-only mode skips this.)
+- [ ] Worktree state inspected (local-edit mode only).
+- [ ] Checks/comments/diff collected; empty comment results confirmed against the correct repo, not assumed absent.
+- [ ] Findings classified and confidence score computed from evidence, stamped with head SHA and check-state.
+- [ ] Merge-ready declared only at confidence `5/5`; never `5/5` while required checks are pending.
 - [ ] Fix plan made before edits.
 - [ ] Risk gates respected.
 - [ ] Tests/lints/typechecks run where applicable.

@@ -4,6 +4,40 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.8.0] - 2026-06-04
+
+### Added
+
+- Confidence Score: pending-checks bucket. A required check in a non-terminal
+  state (`pending`, `in_progress`, `queued`, `expected`) is now scored as
+  unresolved evidence capped at `3/5` with `checks: pending`, not as a failing
+  check (`2/5`) or as passing (`5/5`). Never declare `5/5` while a required check
+  is pending.
+- Preflight: review-only mode (`REVIEW_ONLY`). `review`, `status`, `security`,
+  any `--dry-run` run, and `--post-review` on a PR you do not own no longer
+  require the PR branch to be checked out locally — they pin the PR head SHA from
+  `gh` and read evidence via the API. Phase 1 skips the protected-branch halt and
+  Phase 2 skips the base-branch/head-drift checks in this mode. Fixes spurious
+  halts when reviewing another developer's PR from a different machine or clone
+  (e.g. a reviewer sitting on `main`). Local-edit mode (`fix`/`prepare`) keeps
+  the full protected-branch + base/head-drift gate.
+- Explicit `OWNER/REPO` resolution from the PR reference before any API call,
+  with `--repo "$OWNER/$REPO"` on every `gh pr`/`gh api` command. Stops `gh`'s
+  implicit current-directory repo resolution from silently targeting the wrong
+  repo (fork, renamed remote, different clone) and returning empty comment sets
+  that look like an uncommented PR.
+
+### Changed
+
+- Confidence Score: it is now explicitly relative to the commit it was computed
+  against. Two runs at different head SHAs (or check states) can legitimately
+  produce different scores for the same PR; scores must not be compared without
+  comparing their stamps first.
+- Final Report: `Confidence:` line now stamps the head SHA and check-state —
+  `Confidence: N/5 @ <head-sha> (checks: passing | pending | failing) — reason`.
+  Makes cross-device/cross-run score differences self-explaining instead of
+  looking like a contradiction.
+
 ## [0.7.7] - 2026-06-02
 
 ### Changed
