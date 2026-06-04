@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.12.0
+version: 0.12.1
 author: jperocho
 license: MIT
 metadata:
@@ -220,10 +220,11 @@ When subcommand is `help` or the message is bare `/diffwarden` / `/dw`, reply wi
 ```text
 Diffwarden slash commands (/diffwarden or /dw):
 
-  review [<pr>] [--comment] [--security] [--max N]   read-only review (default: no PR comments)
-  fix [<pr>] [--reply] [--resolve] [--security] [--max N] [--push]
+  review [<pr>] [--comment] [--security] [--delegate] [--max N]
+                                                     read-only review (default: no PR comments)
+  fix [<pr>] [--reply] [--resolve] [--security] [--delegate] [--max N] [--push]
                                                      apply fixes locally (default: no push)
-  prepare [<pr>] [--comment] [--reply] [--resolve] [--security] [--max N]
+  prepare [<pr>] [--comment] [--reply] [--resolve] [--security] [--delegate] [--max N]
                                                      fix, verify, commit, and push
   security [<pr>] [--comment] [--max N]              security-focused read-only review
   status [<pr>]                                      quick merge-readiness snapshot
