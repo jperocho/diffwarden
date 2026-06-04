@@ -494,7 +494,7 @@ held to "PR required" and "CI green" — same as everyone else.
 
 **Touching the skill or its version?** `SKILL.md` is the source of truth; if you
 change it, update `README.md` and `CHANGELOG.md` to match. The version string is
-duplicated across six files and must stay in sync (CI fails otherwise) — see
+duplicated across six places and must stay in sync (CI fails otherwise) — see
 [`CLAUDE.md`](CLAUDE.md) for the exact list and the project's editing rules.
 
 ## Files
