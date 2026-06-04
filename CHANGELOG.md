@@ -4,6 +4,18 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.10.2] - 2026-06-04
+
+### Changed
+
+- **Preflight: deduplicated the review-only vs local-edit explanation.** The
+  mode definition lived in three places verbatim (Preflight intro, the Phase 1
+  protected-branch comment, and the Phase 2 prose). It is now stated once in the
+  Preflight intro; Phase 1 and Phase 2 reference it and keep only their
+  location-specific detail. No behavior change — gate logic, modes, and all
+  bash are identical; this only trims repeated prose to cut per-run input
+  tokens.
+
 ## [0.10.1] - 2026-06-04
 
 ### Changed
