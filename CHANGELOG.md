@@ -4,6 +4,34 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.11.0] - 2026-06-04
+
+### Added
+
+- **Incremental re-collection (loop iterations 2+).** The loop's biggest
+  repeated cost was re-fetching the full diff, every comment, and every CI log
+  on every iteration (full × N). Iterations 2+ may now fetch only what changed
+  since the last collection, cutting cost to roughly full + small × (N-1).
+  Designed so a missed delta is both unreachable at the verdict and cheap to
+  detect:
+  - Iteration 1 is always a full collection.
+  - Small signals (check status, `reviewDecision`, thread resolution state,
+    comment counts) are always re-pulled full; only the diff and failing-check
+    CI logs are deltaed.
+  - **Ancestry guard:** `git merge-base --is-ancestor LAST_HEAD HEAD` (or the PR
+    head SHA in review-only mode) forces a full re-pull on any rebase/force-push.
+  - **Count probe:** a comment-count mismatch vs the last collection forces a
+    full re-pull, catching added or deleted comments (edits don't change the
+    count — see the `updated_at` filter next).
+  - Comment deltas filter on `updated_at` (not `created_at`) so edits and
+    in-place bot updates are caught, and the diff delta unions in files that
+    still carry an open finding.
+  - **The merge-ready verdict always rests on a full collection** — `5/5` is
+    never declared on delta evidence (Loop Algorithm steps 5 and 14).
+  - Each iteration logs its mode (`evidence: full` / `evidence: delta`) so a
+    wrong delta is visible, never silent.
+  - New Common Pitfall and Verification Checklist item cover the delta path.
+
 ## [0.10.2] - 2026-06-04
 
 ### Changed

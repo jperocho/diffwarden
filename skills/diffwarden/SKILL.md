@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.10.2
+version: 0.11.0
 author: jperocho
 license: MIT
 metadata:
@@ -573,6 +573,80 @@ Read local context before fixing:
 - project instructions: `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, README, test docs
 - dependency/config files needed to discover verification commands
 
+### Incremental re-collection (loop iterations 2+)
+
+The first iteration always does a **full** collection (everything above). On
+later iterations, re-fetching the entire diff, every comment, and every CI log
+again is the loop's biggest repeated cost (full × N iterations). Iterations 2+
+may instead fetch only what changed since the last collection — but only when it
+is provably safe, and never for the merge-ready decision. The design makes a
+missed delta both **unreachable at the verdict** and **cheap to detect**.
+
+Track across iterations: `LAST_HEAD` (head SHA at last collection), `LAST_TS`
+(UTC timestamp of last collection), the set of still-open findings, and the last
+known total comment count.
+
+**Always full (never delta), every iteration.** These payloads are small; deltaing
+them buys nothing and risks staleness:
+
+- check *status* (`gh pr checks` — names + conclusions)
+- `reviewDecision` and the PR snapshot's counts (from `gh pr view`)
+- review-thread resolution state (GraphQL `reviewThreads` — ids + `isResolved`)
+
+**Delta only the expensive payloads** — the diff and CI *logs* — and only after
+all of these hold (otherwise fall back to a full re-pull and log the reason):
+
+1. **Ancestry guard.** `LAST_HEAD` must still be in history, else a rebase or
+   force-push happened and a delta diff is meaningless:
+
+   ```bash
+   git merge-base --is-ancestor "$LAST_HEAD" HEAD || echo "FULL: history rewritten"
+   ```
+
+   Local-edit mode only; review-only mode has no local checkout, so compare the
+   PR head SHA from `gh` against `LAST_HEAD` instead. Any external head change
+   already halts the loop (see Stop conditions) — this guard catches our own
+   rebase/amend.
+
+2. **Count probe.** Re-pull the cheap comment counts (always-full above) and
+   compare to the last known total. A mismatch means a comment was **added or
+   deleted** between iterations → full re-pull (edits don't change the count;
+   they're caught by the `updated_at` delta filter below). One integer compare,
+   no bodies downloaded:
+
+   ```bash
+   # if total review+issue comment count != LAST known count → FULL
+   ```
+
+When the guards pass, fetch the delta:
+
+```bash
+# Diff delta — only files changed since last collection, UNION the files that
+# still carry an open finding (so a finding never drops just because its file
+# was not re-touched this iteration). Same client-side glob filter as the full diff.
+git diff "$LAST_HEAD"..HEAD --name-only          # local-edit mode
+# review-only mode: gh pr diff and select files newer than LAST_HEAD via commits
+
+# Comment delta — filter on updated_at (NOT created_at) so EDITED comments and
+# in-place bot updates are caught, not just new ones:
+gh api repos/$OWNER/$REPO/issues/<PR_NUMBER>/comments \
+  --paginate -X GET -f since="$LAST_TS" \
+  -q '.[] | {user: .user.login, body, updated_at}'
+gh api repos/$OWNER/$REPO/pulls/<PR_NUMBER>/comments --paginate \
+  -q ".[] | select(.updated_at > \"$LAST_TS\") | {id, path, line, user: .user.login, body}"
+
+# CI logs — fetch only for checks that NEWLY entered FAILURE this iteration.
+```
+
+**Verdict is always against a full pull.** Never declare `5/5` merge-ready on a
+delta. The iteration that would assert merge-ready must first do one full
+re-collection. Delta speeds the middle of the loop; the final decision always
+sees the complete picture. (Loop Algorithm step 14 enforces this.)
+
+**Auditability.** Log the mode each iteration so a wrong delta is visible, never
+silent: `evidence: full` or `evidence: delta (base=<LAST_HEAD>)` with the
+fall-back reason when a guard forces full. Never silently bound coverage.
+
 ## Classification Taxonomy
 
 Classify every finding as one of these.
@@ -812,9 +886,12 @@ For each iteration:
 
 1. Run the Phase 1 preflight gate. If it fails, halt with a `blocked` report; do not continue.
 2. Detect PR and current head SHA, then run the Phase 2 PR-context gate. Halt on failure.
-3. Collect PR evidence.
+3. Collect PR evidence. Iteration 1: full collection. Iterations 2+: incremental
+   re-collection when its guards pass, else full (see Incremental re-collection).
 4. Classify findings and compute the confidence score.
-5. Stop if confidence is `5/5` (no actionable findings and required checks pass).
+5. Stop if confidence is `5/5` — but only when this iteration's evidence is a
+   **full** collection. If a `5/5` would be declared on delta evidence, do one
+   full re-collection first, then re-confirm. Never declare merge-ready on a delta.
 6. Produce fix plan.
 7. Apply safe scoped fixes.
 8. Run targeted verification.
@@ -823,7 +900,10 @@ For each iteration:
 11. If commit/push authorized, commit/push.
 12. If `--reply-comments` and posting authorized, reply on addressed inline review threads (see Replying to Review Comments). If `--resolve-replied` also authorized, resolve eligible threads.
 13. If `--post-review` and posting authorized, post a `COMMENT` review with findings.
-14. Re-collect PR evidence after checks complete or when user asks to stop.
+14. Re-collect PR evidence after checks complete or when user asks to stop. This
+    re-collection is **full**, not delta — it is the basis for any merge-ready
+    decision. Update `LAST_HEAD`, `LAST_TS`, the open-findings set, and the
+    comment count for the next iteration's delta guards.
 15. If checks are still pending/in progress, report that state explicitly; do not claim merge-ready until required checks reach terminal passing state.
 
 Stop immediately when:
@@ -1172,6 +1252,7 @@ Next action:
 9. **Believing external agents.** Read files and run commands before declaring success.
 10. **Empty comment fetch = no comments.** A `gh api` call against the wrong repo (implicit cwd resolution, fork, renamed remote) returns an empty set that looks identical to a genuinely uncommented PR. Resolve `OWNER/REPO` from the PR reference and confirm it before trusting an empty result.
 11. **Halting a review because the PR branch is not checked out.** Reviewing another developer's PR does not require a local checkout. Use review-only mode: pin the PR head SHA and read evidence via the API; do not fail the head-drift gate.
+12. **Declaring merge-ready on delta evidence.** Incremental re-collection (iterations 2+) speeds the middle of the loop, but a `5/5` verdict must always rest on a full collection. Do a full re-pull before asserting merge-ready, and fall back to full on a rewritten history or a comment-count mismatch.
 
 ## Verification Checklist
 
@@ -1186,6 +1267,7 @@ Before final answer:
 - [ ] Local-edit mode only: current branch is PR head, not base branch. (Review-only mode skips this.)
 - [ ] Worktree state inspected (local-edit mode only).
 - [ ] Checks/comments/diff collected; empty comment results confirmed against the correct repo, not assumed absent.
+- [ ] Iteration 1 was a full collection; any iteration-2+ delta passed its guards (ancestry + comment-count), logged its mode, and the merge-ready verdict rested on a full re-collection.
 - [ ] Findings classified and confidence score computed from evidence, stamped with head SHA and check-state.
 - [ ] Merge-ready declared only at confidence `5/5`; never `5/5` while required checks are pending.
 - [ ] Fix plan made before edits.
