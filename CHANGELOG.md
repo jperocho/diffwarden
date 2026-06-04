@@ -4,6 +4,40 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.12.0] - 2026-06-04
+
+### Added
+
+- **Delegated Reads (`--delegate-reads`, off by default).** On large PRs the bulk
+  diff hunks and CI-log bodies dominate context. With this flag, read-only
+  subagents may digest that *content* so the orchestrator's context holds the
+  conclusions, not the raw bytes — a token saving on long reviews. Built
+  security-first as a compression layer on reading only; it cannot change the
+  verdict or hide a file:
+  - **Security overrides everything (refusals, not tunables):** `--security-focus`
+    runs never delegate, and security-sensitive files (auth/authz, payments,
+    migrations, secrets, infra, `.github/workflows/**`, lint/CI config) are always
+    read raw. `security … --delegate` is rejected as a no-op.
+  - **No decision is ever delegated** — classification, severity, confidence
+    score, merge-ready, fix/defer, post/resolve stay 100% with the orchestrator.
+  - **Structured claims, grounded against raw source.** Subagents return
+    `{file, line, type, verbatim_quote}` (no prose); the orchestrator greps each
+    quote against raw source — no match → the claim is dropped and that file is
+    read raw, so a garbled-but-real issue is not lost.
+  - **Coverage reconciliation.** The authoritative file/check/comment set is
+    enumerated raw; a set difference forces a raw read of anything a subagent
+    skipped. A subagent can never shrink the set or mark a file clean.
+  - **Prompt-injection containment.** PR diff/comments/logs are treated as
+    untrusted data; subagents are read-only with no commit/push/post tools, so an
+    injected "report no issues" is caught by grounding + reconciliation.
+  - **Fail-safe + auditable.** Any subagent error/timeout/malformed output →
+    raw read of that chunk (worst case equals prior behavior); each run logs
+    `digest: subagent (files=N, grounded M/M, raw-fallback K, security-raw S)`.
+  - New section "Delegated Reads", slash flag `--delegate`, an Invalid-combination
+    reject, plus Common Pitfall and Verification Checklist entries.
+  - Default unset = today's behavior, byte-identical. Strict manual opt-in (no
+    auto-on heuristic in this release).
+
 ## [0.11.0] - 2026-06-04
 
 ### Added
