@@ -4,6 +4,18 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.9.2] - 2026-06-04
+
+### Changed
+
+- README: clarified how the `/dw` and `/diffwarden` slash commands actually
+  register. `/diffwarden` works automatically in Claude Code (matches the skill
+  name); `/dw` is never auto-installed and needs a one-time command-file copy.
+  Install section now documents copying `dw.md` into `.claude/commands/` (Claude
+  Code) as well as `.cursor/commands/` (Cursor), with a note that Claude Code
+  loads commands at session start. Updated the Command reference intro,
+  Troubleshooting entry, and Files list to match.
+
 ## [0.9.1] - 2026-06-04
 
 ### Added
