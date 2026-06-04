@@ -510,16 +510,20 @@ before collecting evidence or editing. Halt on failure.
 
 ## Evidence Collection
 
-Collect read-only signals first. Filter server-side so only review signal
-enters context — excluded data (generated files, passing-check logs, fat comment
+Collect read-only signals first. Filter early so only review signal enters
+context — excluded data (generated files, passing-check logs, fat comment
 objects) is never a review target, so trimming it costs no coverage:
 
 ```bash
-# Diff — exclude generated/vendored paths. These are not human-authored and are
-# never the review target; including them is pure noise. Adjust the globs per repo.
-gh pr diff <PR_NUMBER> --repo "$OWNER/$REPO" \
-  -- ':(exclude)*.lock' ':(exclude)**/dist/**' ':(exclude)**/*.min.js' \
-     ':(exclude)**/__snapshots__/**' ':(exclude)**/vendor/**'
+# Diff — drop generated/vendored paths. These are not human-authored and are
+# never the review target; including them is pure noise. `gh pr diff` has no
+# server-side path filter (and review-only runs have no local checkout for
+# `git diff -- :(exclude)`), so filter the diff stream client-side with awk —
+# the excluded hunks still never enter the agent's context. Adjust globs per repo.
+gh pr diff <PR_NUMBER> --repo "$OWNER/$REPO" | awk '
+  /^diff --git / { keep = ($0 !~ /\.lock( |$)/ && $0 !~ /\/dist\// \
+    && $0 !~ /\.min\.js( |$)/ && $0 !~ /__snapshots__\// && $0 !~ /\/vendor\//) }
+  keep'
 
 # Check status only (names + conclusions):
 gh pr checks <PR_NUMBER> --repo "$OWNER/$REPO" --watch=false

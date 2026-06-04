@@ -8,9 +8,10 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 
 ### Changed
 
-- **Evidence Collection now filters server-side** to cut token usage with no
-  loss of review coverage. The diff fetch excludes generated/vendored paths
-  (`*.lock`, `dist/`, `*.min.js`, `__snapshots__/`, `vendor/`); CI logs are
+- **Evidence Collection now filters noise out of context** to cut token usage
+  with no loss of review coverage. The diff stream is path-filtered to drop
+  generated/vendored files (`*.lock`, `dist/`, `*.min.js`, `__snapshots__/`,
+  `vendor/`); CI logs are
   pulled only for failing checks; inline/issue comments are reduced to the
   fields the classifier reads (dropping `diff_hunk`, URLs, reactions); and the
   PR snapshot omits the `comments` field that is fetched separately. These
