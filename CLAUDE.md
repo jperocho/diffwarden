@@ -46,11 +46,14 @@ Use SemVer. Add a CHANGELOG entry for every user-visible change.
 
 ## Verification
 
-No automated tests. To "verify" a change:
+CI (`.github/workflows/ci.yml`) runs on every PR and push to main: it
+shellchecks `install.sh` (`bash -n` + `shellcheck`) and enforces version sync
+across all the files listed above. It is a required status check on `main`.
+Beyond CI, to "verify" a change:
 
 - Re-read `SKILL.md` end-to-end for internal consistency (loop steps, stop
   conditions, classification taxonomy must not contradict each other).
-- Confirm version sync across the three files above.
+- Confirm version sync across the files above (CI also checks this).
 - Confirm README install/usage commands still match the skill.
 
 ## Distribution
