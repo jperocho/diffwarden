@@ -4,6 +4,21 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.10.1] - 2026-06-04
+
+### Changed
+
+- **Evidence Collection now filters server-side** to cut token usage with no
+  loss of review coverage. The diff fetch excludes generated/vendored paths
+  (`*.lock`, `dist/`, `*.min.js`, `__snapshots__/`, `vendor/`); CI logs are
+  pulled only for failing checks; inline/issue comments are reduced to the
+  fields the classifier reads (dropping `diff_hunk`, URLs, reactions); and the
+  PR snapshot omits the `comments` field that is fetched separately. These
+  filters only remove data the review never acts on — same findings, fewer
+  tokens. Added a caution to widen/drop a glob when a matched file is actually
+  human-reviewed, and a pointer to the GraphQL `reviewThreads` query for
+  resolved-thread state.
+
 ## [0.10.0] - 2026-06-04
 
 ### Added

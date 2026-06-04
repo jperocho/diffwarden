@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.10.0
+version: 0.10.1
 author: jperocho
 license: MIT
 metadata:
@@ -510,15 +510,47 @@ before collecting evidence or editing. Halt on failure.
 
 ## Evidence Collection
 
-Collect read-only signals first:
+Collect read-only signals first. Filter server-side so only review signal
+enters context — excluded data (generated files, passing-check logs, fat comment
+objects) is never a review target, so trimming it costs no coverage:
 
 ```bash
-gh pr diff <PR_NUMBER> --repo "$OWNER/$REPO"
+# Diff — exclude generated/vendored paths. These are not human-authored and are
+# never the review target; including them is pure noise. Adjust the globs per repo.
+gh pr diff <PR_NUMBER> --repo "$OWNER/$REPO" \
+  -- ':(exclude)*.lock' ':(exclude)**/dist/**' ':(exclude)**/*.min.js' \
+     ':(exclude)**/__snapshots__/**' ':(exclude)**/vendor/**'
+
+# Check status only (names + conclusions):
 gh pr checks <PR_NUMBER> --repo "$OWNER/$REPO" --watch=false
-gh api repos/$OWNER/$REPO/pulls/<PR_NUMBER>/comments --paginate
-gh api repos/$OWNER/$REPO/issues/<PR_NUMBER>/comments --paginate
-gh pr view <PR_NUMBER> --repo "$OWNER/$REPO" --json number,url,title,body,state,isDraft,author,reviews,comments,files,commits,headRefOid,reviewDecision,statusCheckRollup
+
+# CI logs ONLY for failing checks — a passing check's log is never reviewed.
+# List failures, then fetch logs for just those (e.g. gh run view <run-id> --log-failed):
+gh pr checks <PR_NUMBER> --repo "$OWNER/$REPO" --watch=false \
+  --json name,state,link -q '.[] | select(.state=="FAILURE")'
+
+# Inline review comments — key fields only. Drop diff_hunk/urls/reactions and
+# other fat fields that the classifier never reads:
+gh api repos/$OWNER/$REPO/pulls/<PR_NUMBER>/comments --paginate \
+  -q '.[] | {id, path, line, user: .user.login, body}'
+
+# Issue (general) comments — key fields only:
+gh api repos/$OWNER/$REPO/issues/<PR_NUMBER>/comments --paginate \
+  -q '.[] | {user: .user.login, body}'
+
+# One PR snapshot — each field requested once. Omits `comments` (fetched above)
+# to avoid pulling the same threads twice:
+gh pr view <PR_NUMBER> --repo "$OWNER/$REPO" \
+  --json number,url,title,body,state,isDraft,author,reviews,files,commits,headRefOid,reviewDecision,statusCheckRollup
 ```
+
+These filters drop only data the review never acts on — same findings, less
+context. Do not use them to skip files a human would review (e.g. a hand-edited
+config that happens to match a glob); widen or drop a glob when in doubt.
+
+For resolved-thread state (to skip already-resolved threads), use the GraphQL
+`reviewThreads` query in "Replying to Review Comments" — REST comments do not
+carry resolution state.
 
 If the comment calls return empty, confirm `$OWNER/$REPO` matches the PR URL
 before concluding there are no comments — an empty result against the wrong repo
