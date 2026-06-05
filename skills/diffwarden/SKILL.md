@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.12.1
+version: 0.12.2
 author: jperocho
 license: MIT
 metadata:
@@ -215,10 +215,11 @@ Reject with a one-line reason; suggest the correct command:
 
 ### Help output
 
-When subcommand is `help` or the message is bare `/diffwarden` / `/dw`, reply with:
+When subcommand is `help` or the message is bare `/diffwarden` / `/dw`, reply with
+(substitute `vX.Y.Z` with this skill's frontmatter `version:`):
 
 ```text
-Diffwarden slash commands (/diffwarden or /dw):
+Diffwarden vX.Y.Z — slash commands (/diffwarden or /dw):
 
   review [<pr>] [--comment] [--security] [--delegate] [--max N]
                                                      read-only review (default: no PR comments)
