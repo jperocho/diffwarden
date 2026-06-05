@@ -4,6 +4,22 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.13.0] - 2026-06-05
+
+### Added
+
+- **Best-effort version check on the help path.** Bare `/diffwarden` / `/dw`
+  (and the explicit `help` subcommand) now does one notify-only check for a
+  newer release and, if the installed skill is behind, appends a single
+  `↑ Diffwarden vX.Y.Z available …` line to the help output. Security-first by
+  design: it runs *only* on the help path (never during a review loop), is
+  best-effort and non-blocking (any failure — offline, no `curl`, rate-limit —
+  is silently skipped), uses the unauthenticated public releases API (never
+  reads or sends a token), and is **notify-only** — it never downloads,
+  overwrites, or executes the skill or `install.sh`. Updating stays the user's
+  manual `install.sh` step, preserving the trust boundary the rest of the skill
+  defends.
+
 ## [0.12.2] - 2026-06-05
 
 ### Changed

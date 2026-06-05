@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.12.2
+version: 0.13.0
 author: jperocho
 license: MIT
 metadata:
@@ -238,7 +238,55 @@ Flags: --comment = post new review; --reply = reply on existing review threads;
 <pr>: #123, 123, current, full PR URL, or omit for current branch PR
 ```
 
-Then stop; do not run the loop.
+After the help block, run the **Version Check** below; if a newer release
+exists, append its single notice line. Then stop; do not run the loop.
+
+## Version Check (bare invocation only)
+
+On the help path only — bare `/diffwarden` / `/dw` or the explicit `help`
+subcommand — do one **best-effort** check for a newer release and, if the local
+skill is behind, append a single notice line to the help output. This is the
+only place Diffwarden touches the network for its own version, and it is
+notify-only.
+
+Hard rules (do not relax):
+
+- **Help path only.** Any real subcommand or flag (`review`, `fix`, `prepare`,
+  `security`, `status`, anything with args) → **skip the check entirely**. Never
+  run it during a review loop; mutating or stalling the tool mid-review is out.
+- **Notify only — never auto-update.** Compare versions and print at most one
+  line. Never download, overwrite, execute, or fetch the skill or `install.sh`.
+  Applying an update stays the user's manual step (re-run `install.sh`). Silent
+  self-rewrite would break the same trust boundary the rest of this skill
+  defends.
+- **Best-effort, non-blocking.** Offline, no `curl`, GitHub unreachable,
+  rate-limited, malformed response, or any error → **silently skip**. Never
+  warn, never halt, never delay the help output over a version check.
+- **No token, no auth.** Use the unauthenticated public releases API. Never read
+  `GH_TOKEN`/`GITHUB_TOKEN` or any credential for this check, and never send one.
+- **No spam.** Emit the line only when the latest release is strictly newer than
+  the local frontmatter `version:`. Equal or ahead → print nothing.
+
+Best-effort lookup (empty on any failure; no token sent):
+
+```bash
+# Latest release tag from the canonical public repo. Suppress all errors:
+# any failure leaves $LATEST empty and the check is silently skipped.
+LATEST="$(curl -fsSL --proto '=https' --tlsv1.2 --max-time 3 \
+  https://api.github.com/repos/jperocho/diffwarden/releases/latest 2>/dev/null \
+  | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -1)"
+```
+
+Compare `$LATEST` to the frontmatter `version:` using SemVer ordering (strip any
+leading `v`). Only when `$LATEST` is non-empty **and strictly greater**, append
+exactly one line:
+
+```text
+↑ Diffwarden vX.Y.Z available (you have vA.B.C). Update: re-run install.sh — https://github.com/jperocho/diffwarden
+```
+
+Then stop. The notice never changes classification, fix scope, safety gates, or
+the loop — Diffwarden runs fully on the installed version regardless.
 
 ## External Agent Protocol
 
