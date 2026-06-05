@@ -4,6 +4,24 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.14.0] - 2026-06-05
+
+### Added
+
+- **Local (Uncommitted) Review Mode.** Diffwarden now reviews uncommitted
+  working-tree changes with no PR required. Pass a `local`, `staged`, or
+  `worktree` target to `review`, `fix`, or `security` (e.g. `/dw review local`,
+  `/dw fix staged --security`). `local`/`worktree` cover all changes vs `HEAD`
+  plus untracked files (gitignored excluded); `staged` covers staged changes
+  only. The full review pipeline still applies — classification, severity,
+  confidence score, fix loop, verification, and the security checklist — while
+  the PR-only machinery is skipped: no PR detection, no CI, no review threads,
+  no posting, and no commit or push. Preflight runs with `LOCAL_MODE=1` (skips
+  the `gh`/remote checks; no Phase 2 PR gate). The confidence score drops its CI
+  dimension and reports `checks: n/a (local)`, reflecting readiness-to-commit
+  rather than merge-readiness. `prepare`/`status` and any posting/push flag are
+  rejected with a local target.
+
 ## [0.13.0] - 2026-06-05
 
 ### Added

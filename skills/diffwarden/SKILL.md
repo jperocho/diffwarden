@@ -1,7 +1,7 @@
 ---
 name: diffwarden
-description: "Use when preparing a pull request for merge: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.13.0
+description: "Use when preparing a pull request for merge, or reviewing uncommitted local changes: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
+version: 0.14.0
 author: jperocho
 license: MIT
 metadata:
@@ -15,10 +15,15 @@ metadata:
 
 Diffwarden is an independent PR guardian. It reviews the current pull request from the outside: diff, CI, review threads, bot comments, human comments, tests, and risky code paths. It then classifies findings, plans scoped fixes, verifies changes, and loops until the PR is merge-ready or blocked.
 
+It also runs against **uncommitted local changes** (no PR required) — see Local
+(Uncommitted) Review Mode. Same classification, severity, confidence score, fix
+loop, verification, and security checklist; the PR-only machinery (CI, review
+threads, posting) is simply skipped.
+
 Core loop:
 
 ```text
-preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply safe fixes -> verify -> optional commit/push -> optional thread replies/resolve -> optional post-review -> re-check -> report
+preflight -> detect PR (or resolve local target) -> collect evidence -> classify -> plan fixes -> apply safe fixes -> verify -> optional commit/push -> optional thread replies/resolve -> optional post-review -> re-check -> report
 ```
 
 Default stance: conservative. Diffwarden prepares a PR for merge. It does not auto-merge.
@@ -56,6 +61,7 @@ scope, safety gates, or the loop algorithm.
 Use Diffwarden when the user asks to:
 
 - invoke a `/diffwarden` or `/dw` slash command (see Slash Commands)
+- review uncommitted local changes before committing or opening a PR (see Local (Uncommitted) Review Mode)
 - check a PR before merge
 - address review feedback
 - fix failing PR checks
@@ -78,6 +84,11 @@ Do not use Diffwarden for:
 Supported now:
 
 - PR number or URL, optional. If omitted, detect from current branch.
+- Local target `local`, `staged`, or `worktree`, optional. Review uncommitted
+  working-tree changes instead of a PR (no PR detection, no CI, no review
+  threads, no posting). `local`/`worktree` = all changes vs `HEAD` plus untracked
+  (gitignored excluded); `staged` = staged changes only. See Local (Uncommitted)
+  Review Mode.
 - `--dry-run`, optional. Plan only; no edits, commits, pushes, or comment resolution.
 - `--no-push`, optional. Local fixes only.
 - `--post-review`, optional. Post findings to the PR as a GitHub review of type `COMMENT` (and optional inline comments). Off by default; requires explicit user authorization each run. Never approves, requests changes, or merges.
@@ -117,21 +128,26 @@ required for non-Cursor agents.
 /dw <subcommand> [<pr>] [flags]
 
 <subcommand>  review | fix | prepare | security | status | help
-<pr>          #123 | 123 | current | https://github.com/owner/repo/pull/N | (omit = current branch PR)
+<pr>          #123 | 123 | current | https://github.com/owner/repo/pull/N
+              | local | staged | worktree | (omit = current branch PR)
 <flags>       --comment | --reply | --resolve | --security | --delegate | --push | --max N | --dry-run
 ```
 
 Bare `/diffwarden` or `/dw` with no subcommand → same as `help`.
 
+`local`/`staged`/`worktree` select **Local (Uncommitted) Review Mode** — no PR,
+no CI, no review threads, no posting. Valid only with `review`, `fix`, and
+`security` (see that section and Invalid combinations).
+
 ### Subcommands
 
 | Subcommand | Skill flags | Behavior |
 |------------|-------------|----------|
-| `review` | `--dry-run` | Read-only: collect evidence, classify, plan fixes. No edits, commits, push, or comment resolution. |
-| `fix` | `--no-push` | Review → fix safe issues → verify locally. No push unless `--push`. |
-| `prepare` | *(none — full prep authorized)* | Review → fix → verify → commit/push when verified. |
-| `security` | `--dry-run --security-focus` | Read-only security-focused pass. |
-| `status` | `--dry-run` | Quick merge-readiness snapshot: status, confidence score, blocking findings only — no fix plan. |
+| `review` | `--dry-run` | Read-only: collect evidence, classify, plan fixes. No edits, commits, push, or comment resolution. Accepts a `local`/`staged`/`worktree` target. |
+| `fix` | `--no-push` | Review → fix safe issues → verify locally. No push unless `--push`. Accepts a `local`/`staged`/`worktree` target (never pushes in local mode). |
+| `prepare` | *(none — full prep authorized)* | Review → fix → verify → commit/push when verified. PR only. |
+| `security` | `--dry-run --security-focus` | Read-only security-focused pass. Accepts a `local`/`staged`/`worktree` target. |
+| `status` | `--dry-run` | Quick merge-readiness snapshot: status, confidence score, blocking findings only — no fix plan. PR only. |
 | `help` | — | Print the slash-command reference; do not run the loop. |
 
 ### Flag mapping
@@ -151,6 +167,10 @@ Default iterations: `3`. Hard max: `5` unless the user explicitly overrides in c
 
 ### PR resolution
 
+0. `local`, `staged`, or `worktree` → **not a PR**. Skip PR detection and the
+   Phase 2 PR-context gate entirely; enter Local (Uncommitted) Review Mode with
+   the matching diff scope (`local`/`worktree` = vs `HEAD` + untracked; `staged`
+   = staged only).
 1. Full GitHub PR URL → use as-is.
 2. `#123` or `123` → resolve URL:
 
@@ -171,6 +191,15 @@ If resolution fails, halt with a `blocked` report; do not guess.
 ```text
 /diffwarden review #123
 → Use diffwarden on PR <resolved-url> --dry-run
+
+/diffwarden review local
+→ Use diffwarden on the uncommitted working tree (vs HEAD + untracked) --dry-run
+
+/diffwarden review staged
+→ Use diffwarden on the staged changes (git diff --cached) --dry-run
+
+/diffwarden fix local --security
+→ Use diffwarden on the uncommitted working tree --no-push --security-focus (local mode never pushes)
 
 /diffwarden review #123 --comment
 → Use diffwarden on PR <resolved-url> --dry-run --post-review
@@ -211,6 +240,9 @@ Reject with a one-line reason; suggest the correct command:
 | `prepare … --dry-run` | Contradiction | `review` |
 | `fix … --push` on a fork PR | Cannot push to fork head | `fix …` (local only) or `review … --comment` |
 | `security … --delegate` | Security runs always read raw; delegation is a no-op | `security …` (delegation off) |
+| `prepare local` / `status local` | No PR to prepare or snapshot | `fix local` / `review local` |
+| `* local --comment` / `--reply` / `--resolve` | No PR threads to post to | drop the flag; reply/resolve once a PR exists |
+| `fix local --push` | No PR/remote branch to push in local mode | `fix local` (local only) |
 | `* --max N` where N > 5 | Hard cap | `--max 5` or ask user to override explicitly |
 
 ### Help output
@@ -236,6 +268,8 @@ Flags: --comment = post new review; --reply = reply on existing review threads;
        --delegate = let read-only subagents digest bulk reads (never on security runs/files)
 
 <pr>: #123, 123, current, full PR URL, or omit for current branch PR
+      local | staged | worktree = review uncommitted changes, no PR
+      (works with review/fix/security; no CI, threads, or posting)
 ```
 
 After the help block, run the **Version Check** below; if a newer release
@@ -344,7 +378,9 @@ failed check and the exact command output, then stop.
 The gate runs in two phases. Phase 1 needs no PR context and runs first. Phase 2
 runs after PR detection (see "GitHub PR Detection") and checks the working tree
 against the live PR. Both exit non-zero on failure so the result is
-machine-checkable, not a judgment call.
+machine-checkable, not a judgment call. In Local (Uncommitted) Review Mode, set
+`LOCAL_MODE=1`: Phase 1 skips the `gh` and remote checks and Phase 2 is not run
+at all (there is no PR).
 
 Both phases honor `REVIEW_ONLY`. Set `REVIEW_ONLY=1` for runs that never touch
 the working tree — `review`, `status`, `security`, any `--dry-run` run, and
@@ -364,6 +400,11 @@ fail() { echo "PREFLIGHT FAIL: $*" >&2; exit 1; }
 
 # In a git repo?
 git rev-parse --show-toplevel >/dev/null 2>&1 || fail "not inside a git repo"
+
+# Local (uncommitted) review mode never touches GitHub — skip gh presence/auth.
+# Set LOCAL_MODE=1 for local/staged/worktree targets (see Local Review Mode).
+LOCAL_MODE="${LOCAL_MODE:-0}"
+if [ "$LOCAL_MODE" != "1" ]; then
 
 # GitHub CLI present?
 command -v gh >/dev/null 2>&1 || fail "gh CLI not installed"
@@ -386,8 +427,10 @@ else
   fail "gh not authenticated (gh auth login or export GH_TOKEN)"
 fi
 
-# Remote configured?
+# Remote configured? (PR modes need it; local review of the working tree does not.)
 git remote -v | grep -q . || fail "no git remote configured"
+
+fi  # end LOCAL_MODE skip — gh + remote not required for local review
 
 # Not on a protected/base branch? Only enforced in local-edit mode
 # (REVIEW_ONLY=0); review-only runs never touch the tree (see Preflight intro).
@@ -555,6 +598,110 @@ Never operate directly on the base branch.
 
 Once the PR number is resolved, run the Phase 2 PR-context gate (see Preflight)
 before collecting evidence or editing. Halt on failure.
+
+## Local (Uncommitted) Review Mode
+
+Triggered by a `local`, `staged`, or `worktree` target (see Slash Commands and
+Inputs). Diffwarden reviews the working tree directly — no PR, no remote, no CI,
+no review threads. Use it to vet changes *before* committing or opening a PR.
+
+Everything that defines a review still applies: classification taxonomy,
+severity model, confidence score, fix planning, applying fixes, verification
+strategy, the security checklist, branch/CI protection guards, and the loop.
+Only the PR-bound machinery is skipped.
+
+### What changes vs PR mode
+
+Skipped (no PR exists):
+
+- PR detection, `OWNER/REPO` resolution, and the Phase 2 PR-context gate.
+- CI/check collection and scoring — there are no required checks.
+- Review threads, issue comments, and bot comments.
+- All posting/resolution: `--post-review`, `--reply-comments`, `--resolve-replied`.
+- Commit and push — local mode never commits or pushes (it inspects and, with
+  `fix`, edits the working tree only). The version check is also skipped.
+- Incremental delta re-collection — re-diffing the working tree each iteration is
+  already cheap, so always collect full.
+
+Kept and unchanged: Phase 1 preflight, dirty-worktree handling, classification,
+severity, confidence score, fix plan, fix application rules (no `reset --hard`,
+`clean -fd`, force-push, rebase), verification, security checklist, branch/CI
+protection guards, and the loop with `--max-iterations`.
+
+### Valid invocations
+
+`review`, `fix`, and `security` only. `review local` and `security local` are
+read-only (plan/report, no edits); `fix local` reviews then applies safe scoped
+fixes to the working tree and verifies — it never commits or pushes. `prepare`,
+`status`, and any posting/push flag with a local target are rejected (see Invalid
+combinations).
+
+### Preflight in local mode
+
+Run Phase 1 with `LOCAL_MODE=1`, which skips the `gh` presence/auth and
+remote-configured checks (local mode never touches GitHub) while keeping the
+git-repo and protected-branch checks. Set `REVIEW_ONLY=1` for `review`/`security` (read-only)
+and `REVIEW_ONLY=0` for `fix` (edits the tree). The protected-branch check still
+applies in `fix` mode — reviewing uncommitted changes while sitting on `main` is
+fine for `review`/`security`, but do not apply fixes on a protected branch
+without explicit approval. There is no Phase 2 gate (no PR). If `git diff` for the
+selected scope is empty, report "no uncommitted changes" and stop — nothing to
+review.
+
+### Evidence collection (local)
+
+Replace the PR diff with the working-tree diff for the selected scope. Apply the
+same client-side glob filter as PR mode (drop `*.lock`, `dist/`, `*.min.js`,
+`__snapshots__/`, `vendor/`); adjust globs per repo.
+
+```bash
+# scope = local | worktree  → all uncommitted tracked changes vs HEAD
+git diff HEAD
+
+# scope = staged            → staged changes only
+git diff --cached
+
+# Untracked files (local/worktree only; gitignored already excluded by
+# --exclude-standard). Review each as fully new code — highest risk.
+git ls-files --others --exclude-standard
+
+# Per untracked file, show its contents as an addition for review:
+#   git diff --no-index /dev/null <path>
+```
+
+Build the same mental model as PR mode where it applies: changed files and diff
+size, the (local) acceptance intent from the task, risky paths, and local project
+context — read `AGENTS.md`/`CLAUDE.md`/`.cursorrules`/README, adjacent code, and
+existing tests before fixing. Skip the PR-only inputs (CI status, review/issue
+comments, approvals, reviewed-vs-head commit).
+
+`--delegate-reads` still works (digest bulk diff content under the same grounding
+contract); security files and `security`-focus runs are still read raw.
+
+### Confidence score (local)
+
+Compute the same `0–5` score, but with **no CI dimension** — there are no
+required checks to pass or pend on. Drop every "required check" clause:
+
+- `5/5` merge-ready: no actionable findings, no open P0/P1/security issue,
+  changed files scoped and verified. (Checks criterion does not apply.)
+- `4/5`: only P3/informational findings remain.
+- `3/5`: open P2, or a missing targeted test for changed behavior, or a "needs
+  user decision" finding.
+- `2/5`: any open P1 finding.
+- `0–1/5`: any open P0 or unresolved security finding.
+
+Safety caps still apply (P0/security → `1/5`; needs-user → `3/5`). Stamp the
+score with the local `HEAD` SHA and report `checks: n/a (local)`. The score
+reflects readiness-to-commit, not merge-readiness — Diffwarden still never
+commits or pushes here.
+
+### Reporting (local)
+
+Use the Final Report format. Set `Status: clean | needs fixes | blocked | user
+decision needed`, `PR: n/a (local <scope>)`, and `checks: n/a (local)` in the
+confidence line. Omit the "Comment replies" block (no threads). "Next action" is
+typically `review diff` / `commit` / `run command` — never merge or push.
 
 ## Evidence Collection
 
@@ -858,7 +1005,8 @@ Security findings are blocking until fixed, disproven with evidence, or explicit
 After classifying findings each iteration, assign one PR-level merge-readiness
 score from `0` to `5`. This is Diffwarden's own judgment computed from collected
 evidence — never a value self-reported by an external tool or agent. Recompute
-it from current evidence on every iteration.
+it from current evidence on every iteration. In Local (Uncommitted) Review Mode
+the same scale applies with the CI dimension dropped — see that section.
 
 The score is always relative to the exact commit it was computed against. Two
 runs at different head SHAs (or with checks in different states) can legitimately
@@ -1024,7 +1172,10 @@ Default max iterations: `3`.
 For each iteration:
 
 1. Run the Phase 1 preflight gate. If it fails, halt with a `blocked` report; do not continue.
-2. Detect PR and current head SHA, then run the Phase 2 PR-context gate. Halt on failure.
+2. Detect PR and current head SHA, then run the Phase 2 PR-context gate. Halt on
+   failure. **Local mode** (`local`/`staged`/`worktree` target): skip PR detection
+   and the Phase 2 gate; collect the working-tree diff instead (see Local
+   (Uncommitted) Review Mode). Steps that touch a PR (11–13, CI re-checks) are no-ops.
 3. Collect PR evidence. Iteration 1: full collection. Iterations 2+: incremental
    re-collection when its guards pass, else full (see Incremental re-collection).
    If `--delegate-reads` is set, bulk content may be digested by read-only
@@ -1356,6 +1507,10 @@ Confidence: N/5 @ <head-sha> (checks: passing | pending | failing) — one-line 
 PR: <url>
 Iterations: N/M
 
+# Local mode: Status uses clean | needs fixes | blocked | user decision needed;
+# confidence line shows (checks: n/a (local)); PR: n/a (local <scope>);
+# omit the Comment replies block. See Local (Uncommitted) Review Mode.
+
 Findings:
 - Fixed: N
 - Remaining actionable: N
@@ -1402,6 +1557,7 @@ Next action:
 Before final answer:
 
 - [ ] If invoked via `/diffwarden` or `/dw`, command parsed and expanded to skill flags before the loop.
+- [ ] Local mode (`local`/`staged`/`worktree`): used with `review`/`fix`/`security` only; PR detection, CI, threads, posting, commit, and push all skipped; diff scope correct (vs HEAD + untracked, or staged); confidence reported with `checks: n/a (local)`.
 - [ ] GitHub auth resolved: gh user login preferred (env tokens unset when user active); else valid env token; no token search.
 - [ ] Phase 1 preflight gate passed (env); halted on failure.
 - [ ] `OWNER/REPO` resolved from the PR reference (not implicit cwd repo); substituted into all `gh api`/`gh pr` calls.
