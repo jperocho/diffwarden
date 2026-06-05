@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.13.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.14.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -10,6 +10,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 ## Contents
 
 - [Command reference](#command-reference)
+- [Review uncommitted changes (no PR)](#review-uncommitted-changes-no-pr)
 - [Loop until merge-ready (5/5)](#loop-until-merge-ready-55)
 - [What it actually does](#what-it-actually-does)
 - [Is this for me?](#is-this-for-me)
@@ -28,7 +29,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). PR arg: `#123`, `123`, full URL, `current`, or omit (current branch PR). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). PR arg: `#123`, `123`, full URL, `current`, or omit (current branch PR). Or pass a local target — `local`, `staged`, or `worktree` — to review **uncommitted changes with no PR** (see [Review uncommitted changes](#review-uncommitted-changes-no-pr)). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs the command files — the installer copies them by default; with a manual copy you copy them yourself. Other agents: type `/diffwarden review` as chat text, or use natural language when the skill is loaded.
 
@@ -46,6 +47,10 @@ Invoke with `/diffwarden` (or the optional `/dw` alias). PR arg: `#123`, `123`, 
 | `/diffwarden security [<pr>]` | Read-only security-focused pass. |
 | `/diffwarden security [<pr>] --comment` | Security pass + post findings on PR. |
 | `/diffwarden status [<pr>]` | Quick merge-readiness snapshot (checks, score, blockers). |
+| `/diffwarden review local` | Review uncommitted changes (vs `HEAD` + untracked), no PR. |
+| `/diffwarden review staged` | Review staged changes only, no PR. |
+| `/diffwarden fix local` | Fix safe issues in the working tree (no commit, no push). |
+| `/diffwarden security local` | Security-focused pass on uncommitted changes. |
 | `/diffwarden help` | List commands. Bare `/diffwarden` = help. |
 
 | Flag | Effect |
@@ -57,6 +62,32 @@ Invoke with `/diffwarden` (or the optional `/dw` alias). PR arg: `#123`, `123`, 
 | `--push` | On `fix` only: allow commit + push after verify. |
 | `--max N` | Loop iterations (default `3`, max `5`). |
 | `--dry-run` | On `fix` only: plan without editing (= `review`). |
+
+## Review uncommitted changes (no PR)
+
+Pass a local target instead of a PR to review your working tree before you
+commit or open a PR. No GitHub access, no CI, no review threads — just the diff,
+your project context, and the same review pipeline.
+
+| Target | Diff scope |
+|--------|------------|
+| `local` / `worktree` | All changes vs `HEAD` **plus** untracked files (gitignored excluded). |
+| `staged` | Staged changes only (`git diff --cached`). |
+
+```text
+/dw review local          # read-only review of everything uncommitted
+/dw review staged         # review only what you've git add-ed
+/dw fix local             # review + apply safe fixes to the working tree (no commit/push)
+/dw security local        # security-focused pass on uncommitted changes
+```
+
+Valid only with `review`, `fix`, and `security`. Everything that defines a
+review still runs — classification, severity, confidence score, fix loop,
+verification, security checklist. What's skipped (no PR exists): PR detection,
+CI, review/issue comments, posting (`--comment`/`--reply`/`--resolve`), and any
+commit or push (`fix local` edits the working tree only). The confidence score
+reports `checks: n/a (local)` and reflects readiness-to-commit. `prepare`,
+`status`, and posting/push flags are rejected with a local target.
 
 ## Loop until merge-ready (5/5)
 
@@ -208,7 +239,7 @@ files already up to date, and never overwrites a changed file without asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.13.0/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.14.0/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -511,4 +542,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.13.0`
+Current version: `v0.14.0`
