@@ -4,6 +4,14 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.12.2] - 2026-06-05
+
+### Changed
+
+- Bare `/diffwarden` / `/dw` (and `help`) now show the Diffwarden version in the
+  help header (`Diffwarden vX.Y.Z — slash commands ...`), substituted from the
+  skill's frontmatter `version:`. Docs only; no behavior change.
+
 ## [0.12.1] - 2026-06-04
 
 ### Changed
