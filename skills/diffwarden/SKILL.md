@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge, or reviewing uncommitted local changes: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.16.0
+version: 0.17.0
 author: jperocho
 license: MIT
 metadata:
@@ -136,8 +136,11 @@ required for non-Cursor agents.
 Bare `/diffwarden` or `/dw` with no subcommand → same as `help`.
 
 `local`/`staged`/`worktree` select **Local (Uncommitted) Review Mode** — no PR,
-no CI, no review threads, no posting. Valid only with `review`, `fix`, and
-`security` (see that section and Invalid combinations).
+no CI, no review threads, no posting. Valid with `review`, `fix`, `prepare`, and
+`security` (see that section and Invalid combinations). `prepare` on a local
+target is a fix loop that drives the working tree to clean readiness — it still
+never commits or pushes (no PR exists). `status local` is rejected (no PR to
+snapshot).
 
 ### Subcommands
 
@@ -145,7 +148,7 @@ no CI, no review threads, no posting. Valid only with `review`, `fix`, and
 |------------|-------------|----------|
 | `review` | `--dry-run` | Read-only: collect evidence, classify, plan fixes. No edits, commits, push, or comment resolution. Accepts a `local`/`staged`/`worktree` target. |
 | `fix` | `--no-push` | Review → fix safe issues → verify locally. No push unless `--push`. Accepts a `local`/`staged`/`worktree` target (never pushes in local mode). |
-| `prepare` | *(none — full prep authorized)* | Review → fix → verify → commit/push when verified. PR only. |
+| `prepare` | *(none — full prep authorized)* | **PR:** Review → fix → verify → commit/push when verified. **Local** (`local`/`staged`/`worktree`): loop review → fix → verify until clean (`5/5`) or `--max-iterations` (default `5`), stop at `5/5`; never commits or pushes (no PR). |
 | `security` | `--dry-run --security-focus` | Read-only security-focused pass. Accepts a `local`/`staged`/`worktree` target. |
 | `status` | `--dry-run` | Quick merge-readiness snapshot: status, confidence score, blocking findings only — no fix plan. PR only. |
 | `help` | — | Print the slash-command reference; do not run the loop. |
@@ -163,7 +166,9 @@ no CI, no review threads, no posting. Valid only with `review`, `fix`, and
 | `--max N` | `--max-iterations N` |
 | `--dry-run` | `--dry-run` |
 
-Default iterations: `3`. Hard max: `5` unless the user explicitly overrides in chat.
+Default iterations: `3`. Hard max: `5` unless the user explicitly overrides in
+chat. **Exception:** `prepare` on a local target defaults to `--max-iterations 5`
+(it loops to clean readiness), still capped at the hard max of `5`.
 
 ### PR resolution
 
@@ -200,6 +205,11 @@ If resolution fails, halt with a `blocked` report; do not guess.
 
 /diffwarden fix local --security
 → Use diffwarden on the uncommitted working tree --no-push --security-focus (local mode never pushes)
+
+/diffwarden prepare local
+→ Use diffwarden on the uncommitted working tree --no-push --max-iterations 5,
+  looping review → fix → verify until clean (5/5 local) or 5 iterations
+  (local mode never commits or pushes)
 
 /diffwarden review #123 --comment
 → Use diffwarden on PR <resolved-url> --dry-run --post-review
@@ -240,7 +250,7 @@ Reject with a one-line reason; suggest the correct command:
 | `prepare … --dry-run` | Contradiction | `review` |
 | `fix … --push` on a fork PR | Cannot push to fork head | `fix …` (local only) or `review … --comment` |
 | `security … --delegate` | Security runs always read raw; delegation is a no-op | `security …` (delegation off) |
-| `prepare local` / `status local` | No PR to prepare or snapshot | `fix local` / `review local` |
+| `status local` | No PR to snapshot | `review local` |
 | `* local --comment` / `--reply` / `--resolve` | No PR threads to post to | drop the flag; reply/resolve once a PR exists |
 | `fix local --push` | No PR/remote branch to push in local mode | `fix local` (local only) |
 | `* --max N` where N > 5 | Hard cap | `--max 5` or ask user to override explicitly |
@@ -269,7 +279,8 @@ Flags: --comment = post new review; --reply = reply on existing review threads;
 
 <pr>: #123, 123, current, full PR URL, or omit for current branch PR
       local | staged | worktree = review uncommitted changes, no PR
-      (works with review/fix/security; no CI, threads, or posting)
+      (works with review/fix/prepare/security; no CI, threads, or posting)
+      prepare <local> = loop fix to clean (5/5), max 5; never commits/pushes
 ```
 
 After the help block, run the **Version Check** below; if a newer release
@@ -630,23 +641,33 @@ protection guards, and the loop with `--max-iterations`.
 
 ### Valid invocations
 
-`review`, `fix`, and `security` only. `review local` and `security local` are
-read-only (plan/report, no edits); `fix local` reviews then applies safe scoped
-fixes to the working tree and verifies — it never commits or pushes. `prepare`,
-`status`, and any posting/push flag with a local target are rejected (see Invalid
+`review`, `fix`, `prepare`, and `security` only. `review local` and `security
+local` are read-only (plan/report, no edits); `fix local` reviews then applies
+safe scoped fixes to the working tree and verifies — it never commits or pushes.
+
+`prepare local` (also `prepare staged` / `prepare worktree`) is the local prep
+loop: it repeats review → fix → verify, recomputing the local confidence score
+each pass, until the score reaches `5/5` (clean) or `--max-iterations` is hit
+(default `5` for prepare-local, hard max `5`). It stops as soon as `5/5` is
+reached. Like every local run it **never commits or pushes** — there is no PR;
+the user commits afterward. It also stops early on any normal loop stop condition
+(needs-user decision, oscillation, ambiguous verification failure, out-of-scope
+risk). Then it reports the verdict.
+
+`status` and any posting/push flag with a local target are rejected (see Invalid
 combinations).
 
 ### Preflight in local mode
 
 Run Phase 1 with `LOCAL_MODE=1`, which skips the `gh` presence/auth and
 remote-configured checks (local mode never touches GitHub) while keeping the
-git-repo and protected-branch checks. Set `REVIEW_ONLY=1` for `review`/`security` (read-only)
-and `REVIEW_ONLY=0` for `fix` (edits the tree). The protected-branch check still
-applies in `fix` mode — reviewing uncommitted changes while sitting on `main` is
-fine for `review`/`security`, but do not apply fixes on a protected branch
-without explicit approval. There is no Phase 2 gate (no PR). If `git diff` for the
-selected scope is empty, report "no uncommitted changes" and stop — nothing to
-review.
+git-repo and protected-branch checks. Set `REVIEW_ONLY=1` for `review`/`security`
+(read-only) and `REVIEW_ONLY=0` for `fix`/`prepare` (edit the tree). The
+protected-branch check still applies in `fix`/`prepare` mode — reviewing
+uncommitted changes while sitting on `main` is fine for `review`/`security`, but
+do not apply fixes on a protected branch without explicit approval. There is no
+Phase 2 gate (no PR). If `git diff` for the selected scope is empty, report "no
+uncommitted changes" and stop — nothing to review.
 
 ### Evidence collection (local)
 
@@ -1660,7 +1681,7 @@ PR is a public, misleading claim. Ground it or omit it.
 Before final answer:
 
 - [ ] If invoked via `/diffwarden` or `/dw`, command parsed and expanded to skill flags before the loop.
-- [ ] Local mode (`local`/`staged`/`worktree`): used with `review`/`fix`/`security` only; PR detection, CI, threads, posting, commit, and push all skipped; diff scope correct (vs HEAD + untracked, or staged); confidence reported with `checks: n/a (local)`.
+- [ ] Local mode (`local`/`staged`/`worktree`): used with `review`/`fix`/`prepare`/`security` only; PR detection, CI, threads, posting, commit, and push all skipped; `prepare`-local looped to `5/5` or its `--max-iterations` (default `5`); diff scope correct (vs HEAD + untracked, or staged); confidence reported with `checks: n/a (local)`.
 - [ ] GitHub auth resolved: gh user login preferred (env tokens unset when user active); else valid env token; no token search.
 - [ ] Phase 1 preflight gate passed (env); halted on failure.
 - [ ] `OWNER/REPO` resolved from the PR reference (not implicit cwd repo); substituted into all `gh api`/`gh pr` calls.

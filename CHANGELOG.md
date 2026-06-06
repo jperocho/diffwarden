@@ -4,6 +4,29 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.17.0] - 2026-06-06
+
+### Added
+
+- **`prepare` on a local target.** `prepare local` (also `prepare staged` /
+  `prepare worktree`) is now valid: it loops review → fix → verify on the working
+  tree, recomputing the local confidence score each pass, until the score reaches
+  `5/5` (clean) or `--max-iterations` is hit — stopping as soon as `5/5` is
+  reached, then reporting the verdict. Local prep defaults to `--max-iterations 5`
+  (hard max `5`).
+- Like every local run, `prepare local` **never commits or pushes** (no PR
+  exists); the user commits afterward. It also honors all normal loop stop
+  conditions (needs-user decision, oscillation, ambiguous verification failure,
+  out-of-scope risk).
+
+### Changed
+
+- Local mode now accepts `review` / `fix` / `prepare` / `security` (was
+  `review` / `fix` / `security`). `status local` remains rejected (no PR to
+  snapshot). Updated the Invalid-combinations table, slash-command grammar,
+  subcommand table, expansion examples, help output, and Verification Checklist
+  accordingly.
+
 ## [0.16.0] - 2026-06-06
 
 ### Added

@@ -41,7 +41,7 @@ set -euo pipefail
 # --- constants ---------------------------------------------------------------
 
 SKILL_NAME="diffwarden"
-DEFAULT_REF="v0.16.0"
+DEFAULT_REF="v0.17.0"
 RAW_BASE="https://raw.githubusercontent.com/jperocho/diffwarden"
 COMMAND_FILES=("dw.md" "diffwarden.md")
 
