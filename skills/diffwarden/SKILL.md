@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge, or reviewing uncommitted local changes: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.15.0
+version: 0.16.0
 author: jperocho
 license: MIT
 metadata:
@@ -1271,7 +1271,7 @@ Prefix every posted reply so it is clearly automated:
 ```text
 Diffwarden (automated reply — [TYPE])
 
-[fixed] Fixed in {short_sha}. {one-line summary}. Verify: `{command}`
+[fixed] Fixed in {short_sha}. {one-line summary}. Verify: `{command}`. Test: {1-2 grounded steps for this fix}
 [already-addressed] Addressed in {short_sha}. {evidence: file:line or test}.
 [defer] Deferred — {reason}. Follow-up: {issue/link or "none"}.
 [wontfix] {reason}.
@@ -1434,6 +1434,11 @@ Each posted finding should carry: severity tag, evidence, and a suggested fix �
 the same content as the local report. Posting is advisory; it does not change
 the PR's merge state.
 
+When the run changed code, append the grounded `How to test` block (see How to
+Test) to the review summary body. The hallucination guard is identical online:
+only post test steps that trace to real evidence — a fabricated step in a public
+PR comment is worse than none.
+
 ## Security-Focused Checklist
 
 When `--security-focus` or security-sensitive files are touched, check:
@@ -1531,6 +1536,14 @@ Risks:
 Next action:
 - merge / review diff / approve decision / run command
 
+How to test:                       # fix / prepare runs only — see How to Test
+- Setup: <command>                 # only if the change needs it
+- Exercise: <command that runs the changed behavior>
+- Expect: <observable, grounded result>
+# Omit this block entirely on review/status/dry-run (nothing changed) and when no
+# step can be grounded. Every command, path, flag, and expected output must trace
+# to real evidence — never fabricated. See How to Test.
+
 Verdict:
 - Status: merge-ready | needs fixes | blocked | user decision needed
 - Confidence: N/5 @ <head-sha> (checks: passing | pending | failing) — one-line reason
@@ -1540,6 +1553,90 @@ Verdict:
 # confidence line shows (checks: n/a (local)); PR: n/a (local <scope>);
 # omit the Comment replies block. See Local (Uncommitted) Review Mode.
 ```
+
+## How to Test
+
+When the run **changed code** — `fix` or `prepare` on any target (`local`,
+`staged`, `#123`, `current`, a URL) — add a `How to test` block to the report,
+placed after `Next action` and before `Verdict`. It tells a human how to
+exercise the change by hand and what they should observe. Skip it on read-only
+runs (`review`, `status`, `security`, any `--dry-run`) — nothing changed, so
+there is nothing new to test.
+
+Give concrete, runnable steps, not vague advice. Structure each as:
+
+- **Setup** (only if needed): the exact command(s) to reach the start state.
+- **Exercise**: the exact command/action that runs the changed behavior.
+- **Expect**: the observable result that proves the fix — a file that appears or
+  does not, a value, an exit code, a log line, a UI state.
+
+Mirror the change's own shape: a CLI fix gets shell steps + expected output; a
+library fix gets the call + expected return/raise; an API fix gets the request +
+expected status/body. Prefer the verification commands you actually ran this run
+(see Verification Strategy) — they are already grounded.
+
+### Hallucination guard (hard rule)
+
+Every command, path, flag, env var, and expected output in `How to test` **must
+trace to real evidence** gathered this run. Never invent one. Sources that count
+as grounded:
+
+- a path or symbol present in the diff / changed files,
+- a script or target discovered in `package.json`, `Makefile`, `pyproject.toml`,
+  `.github/workflows/*`, README, or project agent files,
+- a command Diffwarden actually executed this run (with its real exit/output),
+- an existing binary/entry point you confirmed (e.g. `command -v <bin>`).
+
+If a step cannot be grounded, **omit it** — never pad with a plausible-looking
+command. When code changed but nothing testable can be grounded (e.g. a pure
+refactor with no runnable surface), write a single line stating what to inspect
+instead of fabricating commands:
+
+```text
+How to test:
+- Manual: inspect `path/to/file:NN` — <what to confirm>. No runnable check grounded.
+```
+
+Do not guess a test runner, a CLI name, a port, a fixture path, or an output
+string. A wrong "how to test" is worse than none: it sends the reviewer chasing
+a command that does not exist. When unsure whether a step is real, drop it.
+
+### Example (grounded, CLI change)
+
+A change to `install.sh` (this repo's only executable). Every path and command
+below traces to real evidence — `install.sh` copies `SKILL.md` to
+`<root>/.claude/skills/diffwarden/` and command files to `.claude/commands/`,
+and refuses writes outside `.claude/`/`.cursor/`:
+
+```text
+How to test:
+- Setup: proj="$(mktemp -d)" && cd "$proj"   # empty project root
+- Exercise: bash /path/to/diffwarden/install.sh   # choose Claude Code, project scope
+- Expect:
+  - ls .claude/skills/diffwarden/SKILL.md          → present (skill installed)
+  - ls .claude/commands/dw.md .claude/commands/diffwarden.md → both present
+  - grep '^version:' .claude/skills/diffwarden/SKILL.md      → matches DEFAULT_REF
+  - find . -path ./.claude -prune -o -type f -print → nothing written outside .claude/
+- Optional (syntax/lint): bash -n install.sh → exit 0; shellcheck install.sh → clean
+```
+
+Every path (`.claude/skills/diffwarden/SKILL.md`, `.claude/commands/dw.md`) and
+command (`install.sh`, `bash -n`, `shellcheck`) above is real because it traces
+to the changed code and this repo's layout — not because it sounds right.
+
+### In PR comments
+
+When `--comment` (`--post-review`) or `--reply` (`--reply-comments`) is
+authorized and the run changed code, include the same grounded `How to test`
+block in what gets posted:
+
+- `--post-review`: append the `How to test` block to the review summary body.
+- `--reply`: in each `fixed` thread reply, after the `Verify:` command, add the
+  one or two test steps relevant to that specific comment's fix (not the whole
+  report's block). Same hallucination guard — grounded steps only.
+
+The guard is identical online and offline: posting an invented test step to a
+PR is a public, misleading claim. Ground it or omit it.
 
 ## Common Pitfalls
 
@@ -1556,6 +1653,7 @@ Verdict:
 11. **Halting a review because the PR branch is not checked out.** Reviewing another developer's PR does not require a local checkout. Use review-only mode: pin the PR head SHA and read evidence via the API; do not fail the head-drift gate.
 12. **Declaring merge-ready on delta evidence.** Incremental re-collection (iterations 2+) speeds the middle of the loop, but a `5/5` verdict must always rest on a full collection. Do a full re-pull before asserting merge-ready, and fall back to full on a rewritten history or a comment-count mismatch.
 13. **Treating a subagent digest as a finding of record.** Under `--delegate-reads`, a subagent's output is a lead to ground, never a verdict. Enumerate the coverage set raw, grep every `verbatim_quote` against raw source (drop + raw-read on no match), reconcile coverage by set difference, and never delegate a decision or a security file. Worst case, read raw.
+14. **Fabricating "how to test" steps.** A plausible-looking command that does not exist sends the reviewer chasing nothing — worse than no test. Every step in `How to test` (report or PR comment) must trace to real evidence: the diff, a discovered script, a command actually run, a confirmed binary. Cannot ground it → omit it.
 
 ## Verification Checklist
 
@@ -1583,3 +1681,4 @@ Before final answer:
 - [ ] If thread replies were posted, each cites type, evidence, and commit SHA where applicable.
 - [ ] If a review was posted, it was `COMMENT` only (no approve/request-changes) and authorized.
 - [ ] Final report includes status, findings, verification, changed files, risks, next action.
+- [ ] If the run changed code (`fix`/`prepare`), a `How to test` block sits between `Next action` and `Verdict`, every step grounded in real evidence (no fabricated commands/paths); omitted on read-only runs. Same grounded block included in posted review / `fixed` replies when `--comment`/`--reply` authorized.

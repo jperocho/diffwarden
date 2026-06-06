@@ -4,6 +4,20 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.16.0] - 2026-06-06
+
+### Added
+
+- **"How to test" in fix/prepare reports.** When a run changes code (`fix` or
+  `prepare`, any target), the report now adds a grounded `How to test` block
+  between `Next action` and `Verdict` — concrete setup / exercise / expect steps
+  a human can run by hand. Included in posted review bodies (`--comment`) and in
+  `fixed` thread replies (`--reply`). Omitted on read-only runs.
+- **Hallucination guard for test steps.** Every command, path, flag, and
+  expected output in a `How to test` block must trace to real evidence (the
+  diff, a discovered script, a command actually run, a confirmed binary).
+  Ungroundable steps are omitted, never fabricated — online and offline.
+
 ## [0.15.0] - 2026-06-06
 
 ### Changed
