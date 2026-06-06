@@ -39,6 +39,9 @@ coverage/
 # Hermes local runtime
 .hermes/
 
+# Genesis orchestrator local runtime state (not part of the distributable skill)
+.genesis/
+
 # Agent IDE local config (not part of the distributable skill)
 .cursor/
 .claude/
