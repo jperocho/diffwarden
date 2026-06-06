@@ -4,6 +4,28 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.19.0] - 2026-06-06
+
+### Added
+
+- **`fix-plan <filepath>` — Plan Fix Mode.** The edit counterpart to
+  `review-plan`: it runs the same plan critique, then **revises the plan file in
+  place** to address findings, looping review → revise → re-score until
+  plan-readiness `5/5` or `--max-iterations` (default `5`, hard max `5`).
+- Before the first edit it backs up the original to `<filepath>.orig` (and never
+  overwrites an existing backup — it falls back to `<filepath>.orig.N`). It edits
+  **only the plan file**: no code, no git, no commit, no push. Needs-user findings
+  are left flagged, never invented, and the plan is never weakened to raise the
+  score.
+- Flags: `--security` deepens the security pass; `--delegate` may digest a long
+  plan under the grounding contract; `--max N` bounds the loop. `--comment` /
+  `--reply` / `--resolve` / `--push` / `--dry-run` and any `<pr>` / `local` target
+  are rejected.
+- Reports `Plan-readiness: N/5 (checks: n/a (plan))`, the backup path, and
+  `Iterations: N/M`. Updated the grammar, subcommand table, expansion examples,
+  Invalid-combinations table, help output, Final Report notes, and Verification
+  Checklist. Added `review-plan` and `fix-plan` to the README command reference.
+
 ## [0.18.0] - 2026-06-06
 
 ### Added
