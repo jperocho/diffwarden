@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.18.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.19.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -47,6 +47,8 @@ Invoke with `/diffwarden` (or the optional `/dw` alias). PR arg: `#123`, `123`, 
 | `/diffwarden security [<pr>]` | Read-only security-focused pass. |
 | `/diffwarden security [<pr>] --comment` | Security pass + post findings on PR. |
 | `/diffwarden status [<pr>]` | Quick merge-readiness snapshot (checks, score, blockers). |
+| `/diffwarden review-plan <file>` | Critique a plan/design file before coding (read-only, no PR). |
+| `/diffwarden fix-plan <file>` | Revise a plan file in place to address findings (loops to 5/5; backs up to `<file>.orig`). |
 | `/diffwarden review local` | Review uncommitted changes (vs `HEAD` + untracked), no PR. |
 | `/diffwarden review staged` | Review staged changes only, no PR. |
 | `/diffwarden fix local` | Fix safe issues in the working tree (no commit, no push). |
@@ -239,7 +241,7 @@ files already up to date, and never overwrites a changed file without asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.18.0/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.19.0/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -542,4 +544,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.18.0`
+Current version: `v0.19.0`
