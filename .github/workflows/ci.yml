@@ -36,3 +36,24 @@ jobs:
             exit 1
           fi
           echo "Version sync OK (v${v})"
+
+      - name: No orphaned version strings
+        run: |
+          set -euo pipefail
+          v="$(grep -m1 '^version:' skills/diffwarden/SKILL.md | awk '{print $2}')"
+          # These files must reference ONLY the current version. CHANGELOG.md is
+          # deliberately excluded: it is the release history and legitimately lists
+          # every past version. The pattern matches version-shaped tokens
+          # (vX.Y.Z or X.Y.Z — three dot-separated numbers); two-part tokens like
+          # the TLS "1.2" in install.sh do not match.
+          files="skills/diffwarden/SKILL.md README.md install.sh skills/diffwarden/commands/dw.md skills/diffwarden/commands/diffwarden.md"
+          # Drop matches that equal the current version; whatever is left is stale.
+          orphans="$(grep -noE 'v?[0-9]+\.[0-9]+\.[0-9]+' $files \
+            | grep -vE ":v?${v//./\\.}\$" || true)"
+          if [ -n "$orphans" ]; then
+            echo "Orphaned version strings found (these files must reference only v${v}):"
+            echo "$orphans"
+            echo "Fix them to v${v}, or move historical references into CHANGELOG.md."
+            exit 1
+          fi
+          echo "No orphaned version strings (all references == v${v})"
