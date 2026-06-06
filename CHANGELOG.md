@@ -4,6 +4,24 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.18.0] - 2026-06-06
+
+### Added
+
+- **`review-plan <filepath>` — Plan Review Mode.** A new subcommand that
+  critiques a plan/design document *before* any code is written: completeness,
+  ordering & dependencies, ambiguity, scope, risk (destructive/irreversible
+  steps), security, per-step verification, rollback/failure handling, grounding
+  (do the files/commands/symbols the plan names actually exist?), and unstated
+  assumptions.
+- Plan Review Mode is **read-only**: no PR, no git operations, no code edits, no
+  fix loop. It reads the plan and (read-only) the files it references to ground
+  the critique, never rewrites the plan, and reports a `0–5` plan-readiness score
+  (`ready | needs revision | blocked | user decision needed`).
+- Flags: `--security` deepens the security pass; `--delegate` may digest a long
+  plan under the grounding contract. `--comment` / `--reply` / `--resolve` /
+  `--push` and any `<pr>` / `local` target are rejected (no PR, no code change).
+
 ## [0.17.0] - 2026-06-06
 
 ### Added
