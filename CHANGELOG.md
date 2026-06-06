@@ -4,6 +4,15 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.15.0] - 2026-06-06
+
+### Changed
+
+- **Final report puts the verdict last.** Status, Confidence, and Scope now
+  print at the bottom of the report under a `Verdict:` heading, after
+  `Next action`, instead of at the top. Lets the reader scan findings →
+  verification → next action → verdict in order.
+
 ## [0.14.0] - 2026-06-05
 
 ### Added

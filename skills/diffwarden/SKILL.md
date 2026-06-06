@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge, or reviewing uncommitted local changes: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.14.0
+version: 0.15.0
 author: jperocho
 license: MIT
 metadata:
@@ -698,10 +698,12 @@ commits or pushes here.
 
 ### Reporting (local)
 
-Use the Final Report format. Set `Status: clean | needs fixes | blocked | user
-decision needed`, `PR: n/a (local <scope>)`, and `checks: n/a (local)` in the
-confidence line. Omit the "Comment replies" block (no threads). "Next action" is
-typically `review diff` / `commit` / `run command` — never merge or push.
+Use the Final Report format. In the bottom `Verdict:` block, set `Status: clean |
+needs fixes | blocked | user decision needed`, `checks: n/a (local)` in the
+confidence line, and `Scope:` to the reviewed range (e.g. `local worktree vs
+HEAD`). Set `PR: n/a (local <scope>)` near the top. Omit the "Comment replies"
+block (no threads). "Next action" is typically `review diff` / `commit` / `run
+command` — never merge or push.
 
 ## Evidence Collection
 
@@ -1502,14 +1504,8 @@ this skill's frontmatter) on the first line so the user knows which playbook ran
 ```text
 Diffwarden vX.Y.Z result.
 
-Status: merge-ready | needs fixes | blocked | user decision needed
-Confidence: N/5 @ <head-sha> (checks: passing | pending | failing) — one-line reason
 PR: <url>
 Iterations: N/M
-
-# Local mode: Status uses clean | needs fixes | blocked | user decision needed;
-# confidence line shows (checks: n/a (local)); PR: n/a (local <scope>);
-# omit the Comment replies block. See Local (Uncommitted) Review Mode.
 
 Findings:
 - Fixed: N
@@ -1534,6 +1530,15 @@ Risks:
 
 Next action:
 - merge / review diff / approve decision / run command
+
+Verdict:
+- Status: merge-ready | needs fixes | blocked | user decision needed
+- Confidence: N/5 @ <head-sha> (checks: passing | pending | failing) — one-line reason
+- Scope: <what was reviewed>
+
+# Local mode: Status uses clean | needs fixes | blocked | user decision needed;
+# confidence line shows (checks: n/a (local)); PR: n/a (local <scope>);
+# omit the Comment replies block. See Local (Uncommitted) Review Mode.
 ```
 
 ## Common Pitfalls
