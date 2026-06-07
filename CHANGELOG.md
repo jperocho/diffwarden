@@ -4,6 +4,43 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.21.0] - 2026-06-08
+
+### Added
+
+- **Web-Augmented Review (`--web`, alias `--research`; slash `--web`) — opt-in,
+  human-gated web grounding.** Off by default. When enabled *and* genuinely
+  uncertain (a low-confidence finding, a time-sensitive CVE/advisory/best-practice
+  question, or a user-requested deep review), Diffwarden may consult the web to
+  ground a single finding — but only after a per-finding `[y/N]` consent prompt it
+  **waits** on, and only with a redacted minimal finding descriptor. Two gates,
+  both required: the `--web` flag, then per-finding human consent. It never
+  auto-searches silently and never batch-approves.
+- Findings are marked `web-verified` (a consented search grounded it; URL cited)
+  or `local-only` (the default). Web grounding never auto-raises severity and
+  never bypasses a safety cap (P0/security still caps at `1/5`, needs-user at
+  `3/5`) — severity and confidence stay Diffwarden's own judgment.
+- **Data-egress guard.** A web query carries only the abstract finding descriptor;
+  repo source, diff hunks, secrets, tokens, file paths, and internal names are
+  never sent. The exact redacted query is shown in the consent prompt, and the
+  data-exfiltration/scope risk is noted in the finding's rationale.
+- Valid on `review` / `fix` / `prepare` / `security` (code targets, incl.
+  `local` / `staged` / `worktree`) and compatible with `--dry-run` /
+  `--security-focus`; **rejected** on `status` (snapshot only) and plan mode
+  (`--as-plan` or a `.md` plan target). New "Web-Augmented Review (opt-in)"
+  section; wired into Inputs, the slash grammar + flag-mapping table + help
+  output, Invalid-combinations rows, the Confidence Score / Classification flow,
+  the Loop Algorithm, Dry Run Mode, the Final Report, Common Pitfalls, and the
+  Verification Checklist. Synced the `/dw` and `/diffwarden` command files and the
+  README (new "Web-augmented review (opt-in)" section, command/flag tables, TOC).
+
+### Kept
+
+- Full safety stance unchanged: no auto-merge, no force-push, no blind push, no
+  weakening of CI/tests/lint/auth/secrets, and no resolving human comments without
+  explicit approval. Web access is off by default and never silent; the help-path
+  version check remains the only other network call and is unaffected by `--web`.
+
 ## [0.20.0] - 2026-06-07
 
 ### Changed

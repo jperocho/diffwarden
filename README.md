@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.20.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.21.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -12,6 +12,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 - [Command reference](#command-reference)
 - [Review uncommitted changes (no PR)](#review-uncommitted-changes-no-pr)
 - [Auto-detected mode (code vs plan)](#auto-detected-mode-code-vs-plan)
+- [Web-augmented review (opt-in)](#web-augmented-review-opt-in)
 - [Loop until merge-ready (5/5)](#loop-until-merge-ready-55)
 - [What it actually does](#what-it-actually-does)
 - [Is this for me?](#is-this-for-me)
@@ -65,6 +66,7 @@ Invoke with `/diffwarden` (or the optional `/dw` alias). There is **one** `revie
 | `--reply` | Reply on existing reviewer threads (`fixed`, `defer`, `wontfix`, …). |
 | `--resolve` | Resolve threads after `fixed` / `already-addressed` replies (needs `--reply` + OK). |
 | `--security` | Prioritize auth, injection, SSRF, secrets, path traversal, crypto, data loss. |
+| `--web` | Opt into [web-augmented review](#web-augmented-review-opt-in) (alias `--research`). Off by default; asks `[y/N]` before each web search and only sends a redacted finding descriptor. |
 | `--push` | On `fix` only: allow commit + push after verify. |
 | `--max N` | Loop iterations (default `3`, max `5`). |
 | `--dry-run` | On `fix` only: plan without editing (= `review`). |
@@ -130,6 +132,55 @@ never commits or pushes. `prepare`, `security`, and `status` are code-only.
 > The older `review-plan` / `fix-plan` names still work as **hidden back-compat
 > aliases** (equivalent to `review` / `fix <file> --as-plan`), but `review` /
 > `fix` on a `.md` file is the way to invoke plan mode now.
+
+## Web-augmented review (opt-in)
+
+Off by default. Diffwarden grounds its findings against your repo and the diff —
+**never the internet** — unless you turn this on with `--web` (alias
+`--research`). Even then it never searches silently: on an **uncertain** finding
+it asks first and waits for your `y`.
+
+Two gates, both required:
+
+1. **You pass `--web`.** Without it, Diffwarden never touches the network for a
+   review. (The only other network call is the help-path version check.)
+2. **Per finding, it asks and waits:**
+
+   ```text
+   I am unsure about <finding>. Search the web to verify? [y/N]
+   Query (redacted): "<minimal finding descriptor>"
+   ```
+
+   Default is **No**. Anything but `y` skips the search and keeps the finding
+   `local-only`. No batch-approve, no assuming consent from the flag.
+
+**When it offers a search:** only on genuine uncertainty — a low-confidence
+finding, something time-sensitive (a CVE, a security advisory, a deprecation, a
+current best practice or idiomatic pattern), or when you asked for a
+deep/verbose review. High-confidence, locally-provable findings are never sent
+out.
+
+**What leaves your machine:** the **minimal finding descriptor only** — the
+abstract shape of the issue (e.g. "Express open-redirect via unvalidated user
+input"). Never your code, diff, secrets, tokens, file paths, or internal names.
+The exact redacted query is shown in the prompt — what you approve is what's
+sent. A web search is egress to a third party that may be logged or indexed;
+that's why it's gated, redacted, and minimized.
+
+**Output:** every finding is marked `web-verified` (a consented search grounded
+it; URL cited) or `local-only` (the default). Web grounding **never** raises
+severity on its own and never bypasses a safety cap — severity and the
+confidence score stay Diffwarden's own judgment.
+
+Valid on `review`, `fix`, `prepare`, and `security` (code targets, including
+`local` / `staged` / `worktree`), and compatible with `--dry-run` and
+`--security`. Rejected on `status` (snapshot only) and on plan mode (`--as-plan`
+or a `.md` plan target) — plan critique grounds against your repo, not the web.
+
+```text
+/dw review #123 --web      # asks [y/N] before grounding any uncertain finding
+/dw fix --web --security   # security run reads raw; web grounding still per-finding gated
+```
 
 ## Loop until merge-ready (5/5)
 
@@ -281,7 +332,7 @@ files already up to date, and never overwrites a changed file without asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.20.0/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.21.0/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -440,6 +491,7 @@ Add these after the command. Combine freely.
 | `--post-review` | Post findings to the PR as a GitHub `COMMENT` review (plus optional inline comments). Off by default; needs your explicit OK each run. Never approves, requests changes, or merges. |
 | `--reply-comments` | Reply on existing inline review threads after fixes. Types: `fixed`, `already-addressed`, `defer`, `wontfix`, `needs-user`. Off by default; needs your OK each run. |
 | `--resolve-replied` | Resolve threads after `fixed` / `already-addressed` replies. Requires `--reply-comments` and explicit OK. |
+| `--web` / `--research` | Opt into [web-augmented review](#web-augmented-review-opt-in). Off by default; even when set, Diffwarden asks `[y/N]` and waits before each web search and only sends a redacted finding descriptor. Code targets only; rejected on `status` and plan mode. |
 | `--max-iterations N` | How many review→fix→verify rounds. Default `3`; hard max `5` unless you say otherwise. |
 
 ## Common recipes
@@ -585,4 +637,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.20.0`
+Current version: `v0.21.0`
