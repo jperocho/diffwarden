@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge, or reviewing uncommitted local changes: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.20.0
+version: 0.21.0
 author: jperocho
 license: MIT
 metadata:
@@ -97,6 +97,7 @@ Supported now:
 - `--resolve-replied`, optional. With `--reply-comments`, resolve review threads where reply type is `fixed` or `already-addressed`. Off by default; requires explicit user authorization. Never resolve human threads without both flags and authorization.
 - `--security-focus`, optional. Prioritize auth, input validation, secrets, data loss, SSRF, injection, path traversal, crypto, and logging leaks.
 - `--delegate-reads`, optional. Off by default. Lets read-only subagents digest bulk diff/CI-log *content* to save context tokens on large reviews, under the strict contract in "Delegated Reads." Never delegates security-focused runs or security-sensitive files (they are read raw), never delegates any decision, and every subagent claim is grounded against raw evidence before it counts. Unset = no delegation (today's behavior).
+- `--web` (alias `--research`), optional. Off by default. Opt into **Web-Augmented Review**: when genuinely uncertain about a finding (low confidence, a guess, time-sensitive CVE/advisory/best-practice question, or a user-requested deep review), Diffwarden may ground it against the web (latest CVEs, security advisories, current best practice, idiomatic patterns) — but only after a per-finding `[y/N]` consent prompt it **waits** on, and only sending a redacted minimal finding descriptor (never repo code, diff hunks, secrets, paths, or internal names). Unset = no web access for the review. Never auto-searches silently; never raises severity or bypasses a safety cap. See Web-Augmented Review (opt-in).
 - `--max-iterations N`, optional. Default `3`; hard max `5` unless the user explicitly asks otherwise.
 - Slash commands `/diffwarden` and `/dw`, optional. See Slash Commands.
 
@@ -134,7 +135,7 @@ required for non-Cursor agents.
               | path/to/plan.md   (single prose .md, no diff)               → plan
               | (omit = current branch PR / working tree)                   → code
 <flags>       --as-code | --as-plan | --comment | --reply | --resolve
-              | --security | --delegate | --push | --max N | --dry-run
+              | --security | --delegate | --web | --push | --max N | --dry-run
 ```
 
 Bare `/diffwarden` or `/dw` with no subcommand → same as `help`.
@@ -241,6 +242,7 @@ Hidden back-compat aliases (not advertised in `help`): `review-plan <filepath>` 
 | `--resolve` | `--resolve-replied` (requires `--reply` and explicit user authorization) |
 | `--security` | `--security-focus` |
 | `--delegate` | `--delegate-reads` (no-op on security runs — they always read raw) |
+| `--web` | `--web` (alias `--research`): opt into web-augmented review; off by default, asks `[y/N]` before each search and sends only a redacted finding descriptor (rejected on `status` and plan mode) |
 | `--push` | omit `--no-push` on `fix` only (allows push after verification) |
 | `--max N` | `--max-iterations N` |
 | `--dry-run` | `--dry-run` |
@@ -325,6 +327,16 @@ Each `review`/`fix` line shows the auto-detected mode banner it must print.
 /diffwarden security #123 --comment
 → Use diffwarden on PR <resolved-url> --dry-run --security-focus --post-review
 
+# Web-augmented review: opt-in, doubly gated. --web is compatible with --dry-run.
+/diffwarden review #123 --web
+→ detected: code review. Use diffwarden on PR <resolved-url> --dry-run --web
+  (uncertain findings only; asks "[y/N]" before each web search, sends a redacted
+  descriptor; marks findings web-verified vs local-only)
+
+/diffwarden fix --web --security
+→ detected: code fix. Use diffwarden on the current PR --no-push --web --security-focus
+  (security run reads raw; web grounding still per-finding [y/N]-gated)
+
 /diffwarden status
 → Use diffwarden on the current PR --dry-run. Report Diffwarden version (frontmatter `version:`), status, confidence score, and blocking findings only — no fix plan.
 
@@ -381,6 +393,8 @@ Reject with a one-line reason; suggest the correct command:
 | `--as-plan` / `review`-detected-plan with no filepath | Plan mode needs an existing file | `review <filepath>` / `fix <filepath>` |
 | `prepare` / `security` / `status` on a `.md` plan or `--as-plan` | Code-only; no plan equivalent | `review <plan.md>` (critique) or `fix <plan.md>` (revise) |
 | plan-mode `review`/`fix` … `--comment` / `--reply` / `--resolve` / `--push` | No PR and no thread to post or push; plan `fix` edits only the plan file | drop the flag (plan modes touch no PR) |
+| `status … --web` | Status is a snapshot, not a finding investigation | `review … --web` |
+| `--web` on a `.md` plan / `--as-plan` (plan mode) | Plan critique grounds against the repo, not the web | drop `--web`, or run code `review`/`fix … --web` |
 | `* --max N` where N > 5 | Hard cap | `--max 5` or ask user to override explicitly |
 
 ### Help output
@@ -391,13 +405,13 @@ When subcommand is `help` or the message is bare `/diffwarden` / `/dw`, reply wi
 ```text
 Diffwarden vX.Y.Z — slash commands (/diffwarden or /dw):
 
-  review [<target>] [--as-code|--as-plan] [--comment] [--security] [--delegate] [--max N]
+  review [<target>] [--as-code|--as-plan] [--comment] [--security] [--delegate] [--web] [--max N]
                                                      read-only review (default: no PR comments)
-  fix [<target>] [--as-code|--as-plan] [--reply] [--resolve] [--security] [--delegate] [--max N] [--push]
+  fix [<target>] [--as-code|--as-plan] [--reply] [--resolve] [--security] [--delegate] [--web] [--max N] [--push]
                                                      apply fixes locally (default: no push)
-  prepare [<pr>] [--comment] [--reply] [--resolve] [--security] [--delegate] [--max N]
+  prepare [<pr>] [--comment] [--reply] [--resolve] [--security] [--delegate] [--web] [--max N]
                                                      fix, verify, commit, and push
-  security [<pr>] [--comment] [--max N]              security-focused read-only review
+  security [<pr>] [--comment] [--web] [--max N]      security-focused read-only review
   status [<pr>]                                      quick merge-readiness snapshot
   help                                               this message
 
@@ -408,6 +422,8 @@ the chosen mode: "detected: code review | plan review | code fix | plan fix".
 
 Flags: --comment = post new review; --reply = reply on existing review threads;
        --resolve = resolve threads after fixed replies (needs --reply + your OK);
+       --web = human-gated web grounding of uncertain findings (off by default;
+               asks "[y/N]" before each search, sends only a redacted descriptor);
        --delegate = let read-only subagents digest bulk reads (never on security runs/files)
 
 <target>: #123, 123, current, full PR URL, or omit for current branch PR (code)
@@ -1321,6 +1337,12 @@ Stop and ask the user if a finding involves:
 - dependency removal
 - broad refactor beyond PR scope
 
+Low-confidence findings (a guess, a possible false-positive) and time-sensitive
+ones (CVEs, advisories, current best practice, idiomatic patterns) are candidates
+for human-gated web grounding when `--web` is set — see Web-Augmented Review.
+Grounding only refines a finding's *evidence*; it never changes how the finding is
+classified on its own, and an ungrounded/refused search leaves it `local-only`.
+
 ## Severity Model
 
 Use this priority order:
@@ -1377,6 +1399,111 @@ Safety caps override the scale. Regardless of other passing signals:
 The score is advisory for ranking and reporting and a gate for the loop. It
 never lowers a safety bar — a high score does not authorize merge, push, or
 comment resolution, and Diffwarden still never auto-merges.
+
+When `--web` is enabled, a **low-confidence** finding that holds the score down
+may be grounded with a human-gated web search (see Web-Augmented Review). A web
+result can add or remove evidence — but it never raises the score past a safety
+cap (P0/security still caps at `1/5`, needs-user at `3/5`), and the score stays
+Diffwarden's own judgment, computed from evidence as above.
+
+## Web-Augmented Review (opt-in)
+
+Off by default. Diffwarden grounds its findings against the repo and the diff —
+**never the open internet** — unless the human turns this on. When enabled *and*
+genuinely uncertain, Diffwarden may consult the web to ground a single finding
+(latest CVEs, security advisories, current best practice, idiomatic patterns) —
+but only after a per-finding human yes/no it waits on, and only with a redacted
+finding descriptor. It is a grounding layer on a finding's *evidence*: it never
+decides, never raises severity on its own, and never bypasses a safety cap.
+
+Modeled on the `gh`/posting gates and the "never trust self-report — ground every
+claim" stance. A web result is untrusted external data to weigh, not a verdict to
+adopt — the same way a subagent digest is a lead, not a finding of record (see
+Delegated Reads), and the same way Diffwarden's confidence is its own judgment,
+never self-reported by an external tool.
+
+### Two gates (both required, non-negotiable)
+
+A network call happens only when **both** hold:
+
+1. **Flag gate.** The human passed `--web` (alias `--research`; slash `--web`).
+   Unset = no web access for the review, ever — today's behavior, byte-identical.
+   (The help-path version check is the only other network call; it is unrelated
+   to and unaffected by `--web`.)
+2. **Per-finding consent gate.** Even with `--web`, before *any* network call on
+   an uncertain finding, Diffwarden surfaces the prompt and **waits** for a human
+   `y`:
+
+   ```text
+   I am unsure about <finding id / one-line desc>. Search the web to verify? [y/N]
+   Query (redacted): "<minimal finding descriptor>"
+   ```
+
+   Default is **No** (`[y/N]`). No reply, anything other than `y`, or a
+   non-interactive run → skip the search and keep the finding **local-only**.
+   Never auto-search silently, never batch-approve a set of findings, never treat
+   the flag itself as consent for the call.
+
+### When web grounding is offered
+
+Only on genuine uncertainty — never for a finding Diffwarden can already prove
+locally. Offer a search when, and only when:
+
+- the finding is **low confidence** — a guess, a "might be", a possible
+  false-positive, or
+- it depends on something that moves over time — a CVE, a security advisory, a
+  deprecation, a current best practice, or an idiomatic pattern, or
+- the user explicitly asked for a **deep / verbose / thorough** review.
+
+Ground locally first: read the code, the diff, and the repo. Go to the web only
+for what the repo cannot answer. A high-confidence, locally-provable finding is
+grounded as usual and stays `local-only` — do not offer a search for it.
+
+### What may leave the machine (hard rule)
+
+The query carries the **minimal finding descriptor only** — the abstract shape of
+the issue (e.g. "Express open-redirect via unvalidated res.redirect input",
+"Python pickle deserialization RCE"). Redact before every search. Never send,
+paste, or embed:
+
+- repo source, diff hunks, or patch content,
+- secrets, tokens, credentials, env values, internal hostnames, or customer data,
+- file paths, symbol names, or comments that reveal proprietary/internal detail.
+
+Show the human the exact redacted query in the consent prompt — **what they
+approve is what gets sent**. State the data-exfiltration / scope risk in the
+finding's rationale: a web search is egress to a third party and may be logged or
+indexed, which is why it is gated, redacted, and minimized. If a descriptor
+cannot be redacted to a safe abstract shape, do not search — keep the finding
+`local-only`.
+
+### Output (web-verified vs local-only)
+
+- **Mark every finding** `web-verified` or `local-only`. Default is `local-only`;
+  a finding becomes `web-verified` only after a consented search actually grounded
+  it.
+- **Cite the source.** Every web-grounded finding lists the URL(s) it rests on.
+  No URL → it is not web-verified; report it `local-only`.
+- **Web never raises the bar by itself.** A web result may add evidence or
+  context, but it never auto-raises severity, never lifts a safety cap, and never
+  turns a needs-user decision into an automatic one. Severity and the confidence
+  score stay Diffwarden's own judgment, computed as before.
+- A web result that *contradicts* a finding is evidence too — downgrade or drop
+  the finding and say so, citing the source.
+
+### Where it is valid
+
+`--web` works on **code targets** with `review`, `fix`, `prepare`, and `security`
+(including `local` / `staged` / `worktree`), and is compatible with `--dry-run`
+and `--security-focus` (web grounding is read-only assessment). It is **rejected**
+on `status` (a snapshot, not a finding investigation) and in **plan mode**
+(`--as-plan` or a `.md` plan target — plan critique grounds against the repo, not
+the web). See Invalid combinations.
+
+Hard rules: a refused or skipped search leaves the finding `local-only` and never
+blocks the review; web grounding is read-only — it never edits, commits, posts,
+or resolves; and it never relaxes any other gate (no auto-merge, no force-push, no
+weakening of CI/tests/lint/auth/secrets, no resolving human comments).
 
 ## Fix Planning Protocol
 
@@ -1513,7 +1640,13 @@ For each iteration:
    If `--delegate-reads` is set, bulk content may be digested by read-only
    subagents, but the coverage set is enumerated raw, every claim is grounded
    against raw source, and security files/runs are read raw (see Delegated Reads).
-4. Classify findings and compute the confidence score.
+4. Classify findings and compute the confidence score. If `--web` is set, any
+   low-confidence or time-sensitive finding may be offered for a **human-gated**
+   web search before it is finalized (per-finding `[y/N]`, redacted descriptor
+   only — see Web-Augmented Review); mark each finding `web-verified` or
+   `local-only`. A skipped or refused search leaves the finding `local-only` and
+   never blocks the loop, and a web result never raises severity or lifts a
+   safety cap.
 5. Stop if confidence is `5/5` — but only when this iteration's evidence is a
    **full** collection. If a `5/5` would be declared on delta evidence, do one
    full re-collection first, then re-confirm. Never declare merge-ready on a delta.
@@ -1828,6 +1961,9 @@ In dry-run mode:
 - do not commit
 - do not push
 - do not post thread replies or resolve comments
+- if `--web` is set, web grounding still runs **only** through the per-finding
+  `[y/N]` gate and sends only a redacted descriptor; it is read-only assessment,
+  so it is allowed in dry-run (it never edits, commits, posts, or resolves)
 
 Use dry-run when risk is unclear or user asks for assessment only.
 
@@ -1847,6 +1983,7 @@ Findings:
 - Remaining actionable: N
 - Informational: N
 - Already addressed: N
+- Web-verified: N / Local-only: M   # only when --web enabled; default is local-only
 
 Comment replies:
 - Replied: N/M (fixed: N, already-addressed: N, defer: N, wontfix: N, needs-user: N)
@@ -1862,6 +1999,9 @@ Changed files:
 
 Risks:
 - risk or "none known"
+
+Sources:                              # only when --web grounded a finding; omit otherwise
+- <finding id> — <URL>                # each web-verified finding cites its source(s)
 
 Next action:
 - merge / review diff / approve decision / run command
@@ -1994,6 +2134,7 @@ PR is a public, misleading claim. Ground it or omit it.
 12. **Declaring merge-ready on delta evidence.** Incremental re-collection (iterations 2+) speeds the middle of the loop, but a `5/5` verdict must always rest on a full collection. Do a full re-pull before asserting merge-ready, and fall back to full on a rewritten history or a comment-count mismatch.
 13. **Treating a subagent digest as a finding of record.** Under `--delegate-reads`, a subagent's output is a lead to ground, never a verdict. Enumerate the coverage set raw, grep every `verbatim_quote` against raw source (drop + raw-read on no match), reconcile coverage by set difference, and never delegate a decision or a security file. Worst case, read raw.
 14. **Fabricating "how to test" steps.** A plausible-looking command that does not exist sends the reviewer chasing nothing — worse than no test. Every step in `How to test` (report or PR comment) must trace to real evidence: the diff, a discovered script, a command actually run, a confirmed binary. Cannot ground it → omit it.
+15. **Searching the web silently.** Web grounding is doubly gated: the `--web` flag AND a per-finding `[y/N]` the human answers. Never auto-search, never batch-approve a set of findings, never treat the flag as consent for the call. Never send repo code, diff, secrets, paths, or internal names — only a redacted finding descriptor, shown in the prompt. A web result never raises severity or lifts a safety cap; cite the URL and mark the finding `web-verified`, else it stays `local-only`. `--web` is rejected on `status` and plan mode.
 
 ## Verification Checklist
 
@@ -2014,6 +2155,7 @@ Before final answer:
 - [ ] Checks/comments/diff collected; empty comment results confirmed against the correct repo, not assumed absent.
 - [ ] Iteration 1 was a full collection; any iteration-2+ delta passed its guards (ancestry + comment-count), logged its mode, and the merge-ready verdict rested on a full re-collection.
 - [ ] If `--delegate-reads` was set: coverage set enumerated raw; every subagent claim grounded against raw source (no-match → dropped + file read raw); coverage reconciled by set difference; security-focus runs and security-sensitive files read raw; no decision delegated; digest mode logged.
+- [ ] If `--web` (alias `--research`) was set: every web search ran only after its per-finding `[y/N]` consent (never auto/silent, never batch-approved); only a redacted minimal finding descriptor left the machine (no repo code, diff, secrets, paths, or internal names); each web-grounded finding marked `web-verified` with a cited URL, all others `local-only`; web grounding never raised severity or bypassed a safety cap. `--web` unset → no web access occurred. `status` / plan-mode `--web` rejected.
 - [ ] Findings classified and confidence score computed from evidence, stamped with head SHA and check-state.
 - [ ] Merge-ready declared only at confidence `5/5`; never `5/5` while required checks are pending.
 - [ ] Fix plan made before edits.
