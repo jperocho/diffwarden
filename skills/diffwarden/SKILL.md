@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Use when preparing a pull request for merge, or reviewing uncommitted local changes: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.19.0
+version: 0.20.0
 author: jperocho
 license: MIT
 metadata:
@@ -125,30 +125,26 @@ required for non-Cursor agents.
 ### Grammar
 
 ```text
-/diffwarden <subcommand> [<pr>] [flags]
-/dw <subcommand> [<pr>] [flags]
+/diffwarden <subcommand> [<target>] [flags]
+/dw <subcommand> [<target>] [flags]
 
-<subcommand>  review | fix | prepare | security | status | review-plan | fix-plan | help
-<pr>          #123 | 123 | current | https://github.com/owner/repo/pull/N
-              | local | staged | worktree | (omit = current branch PR)
-<filepath>    path to a plan/design file — REQUIRED by review-plan and fix-plan only
-<flags>       --comment | --reply | --resolve | --security | --delegate | --push | --max N | --dry-run
+<subcommand>  review | fix | prepare | security | status | help
+<target>      #123 | 123 | current | https://github.com/owner/repo/pull/N   → code
+              | local | staged | worktree                                   → code
+              | path/to/plan.md   (single prose .md, no diff)               → plan
+              | (omit = current branch PR / working tree)                   → code
+<flags>       --as-code | --as-plan | --comment | --reply | --resolve
+              | --security | --delegate | --push | --max N | --dry-run
 ```
 
 Bare `/diffwarden` or `/dw` with no subcommand → same as `help`.
 
-`review-plan <filepath>` selects **Plan Review Mode** — a read-only critique of a
-plan/design document before any code is written. No PR, no git, no code edits, no
-fix loop (see Plan Review Mode). It takes a `<filepath>`, never a `<pr>` or a
-local target.
-
-`fix-plan <filepath>` selects **Plan Fix Mode** — the edit counterpart to
-`review-plan`. It runs the same critique, then revises the plan file *in place* to
-address findings, looping review → revise → re-score until plan-readiness `5/5` or
-`--max-iterations` (default `5`). It backs up the original to `<filepath>.orig`
-before the first edit, edits only the plan file, and never touches code, commits,
-or pushes (see Plan Fix Mode). Like `review-plan` it takes a `<filepath>`, never a
-`<pr>` or a local target.
+There is **one** `review` and **one** `fix`. They auto-detect whether the target
+is *code* (a PR, a local diff) or a *plan* (a prose `.md` design doc) and select
+the matching mode — see **Target Auto-Detection** below. `prepare`, `security`,
+and `status` operate only on code targets (no plan equivalent). The previous
+`review-plan` / `fix-plan` names are kept as **hidden back-compat aliases** only
+(see Hidden Aliases); new usage is `review <plan.md>` / `fix <plan.md>`.
 
 `local`/`staged`/`worktree` select **Local (Uncommitted) Review Mode** — no PR,
 no CI, no review threads, no posting. Valid with `review`, `fix`, `prepare`, and
@@ -157,23 +153,89 @@ target is a fix loop that drives the working tree to clean readiness — it stil
 never commits or pushes (no PR exists). `status local` is rejected (no PR to
 snapshot).
 
+### Target Auto-Detection (mode selection)
+
+`review` and `fix` carry two internal modes — **code** (the PR / local-diff
+pipeline) and **plan** (the plan-document critique). The mode-specific rubric
+logic is unchanged; only the entrypoint collapses. Diffwarden classifies the
+*target* to pick the mode. This is classification of the argument only — it never
+reads or mutates a file before the run's normal, gated steps.
+
+Decide the mode in this strict order (first match wins):
+
+1. `--as-plan` flag → **plan** mode (override; see below).
+2. `--as-code` flag → **code** mode (override).
+3. Target is exactly one `.md` path, the file exists, and it reads as a prose
+   plan (markdown headings / task sections, **no** diff payload) → **plan** mode.
+4. Target is a PR ref / URL / `#num` / `current` / a branch ref, or `local` /
+   `staged` / `worktree`, or carries diff content → **code** mode.
+5. **Mixed signals** (e.g. a PR ref *and* a `.md` plan path, or a `.md` file that
+   also contains diff hunks) → **ask the user which mode**; state that the
+   **default is code** if they do not choose. Never silently guess on a mix.
+6. No target → **code** mode against local state (current-branch PR, or the
+   working tree).
+
+Diff markers that signal **code** (not a plan), any of:
+
+- `diff --git`, `+++ `, `--- ` / `@@ ` hunk headers
+- merge-conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
+- patch fences / a `.patch` or `.diff` extension
+
+Prose signals that mark a `.md` as a **plan**: markdown headings and task/step
+sections with no patch hunks and no file-diff payload.
+
+`--as-code` / `--as-plan` are explicit overrides and win over the detector
+(steps 1–2). Use `--as-code <plan.md>` to review a markdown file as a normal code
+change (diff review) instead of critiquing it as a plan; use `--as-plan <file>`
+to force plan mode. They are mutually exclusive, and `--as-plan` is invalid on a
+PR / `local` / `staged` / `worktree` target (a PR is not a plan document — see
+Invalid combinations).
+
+**Mode banner (mandatory output).** Every `review` / `fix` run states the
+auto-selected mode on its own line *before* doing any work, exactly one of:
+
+```text
+detected: code review     # review, code target
+detected: plan review     # review, plan (.md) target
+detected: code fix        # fix, code target
+detected: plan fix        # fix, plan (.md) target
+```
+
+The banner is required, not optional — it is how the user confirms the detector
+picked the mode they meant. On an override, still print the resulting line (e.g.
+`review plan.md --as-code` → `detected: code review`). `prepare` / `security` /
+`status` are code-only and need no banner.
+
+### Hidden Aliases (back-compat)
+
+`review-plan <filepath>` and `fix-plan <filepath>` are still accepted as exact
+equivalents of `review <filepath> --as-plan` and `fix <filepath> --as-plan`. They
+are **back-compat only**: not advertised in `help`, not shown as primary usage,
+and not the recommended form. When one is used, expand it to the `--as-plan` form
+and print the matching banner (`detected: plan review` / `detected: plan fix`).
+All Plan Review Mode / Plan Fix Mode rules apply unchanged.
+
 ### Subcommands
 
 | Subcommand | Skill flags | Behavior |
 |------------|-------------|----------|
-| `review` | `--dry-run` | Read-only: collect evidence, classify, plan fixes. No edits, commits, push, or comment resolution. Accepts a `local`/`staged`/`worktree` target. |
-| `fix` | `--no-push` | Review → fix safe issues → verify locally. No push unless `--push`. Accepts a `local`/`staged`/`worktree` target (never pushes in local mode). |
-| `prepare` | *(none — full prep authorized)* | **PR:** Review → fix → verify → commit/push when verified. **Local** (`local`/`staged`/`worktree`): loop review → fix → verify until clean (`5/5`) or `--max-iterations` (default `5`), stop at `5/5`; never commits or pushes (no PR). |
-| `security` | `--dry-run --security-focus` | Read-only security-focused pass. Accepts a `local`/`staged`/`worktree` target. |
-| `status` | `--dry-run` | Quick merge-readiness snapshot: status, confidence score, blocking findings only — no fix plan. PR only. |
-| `review-plan` | `--dry-run` (read-only) | Critique a plan/design file at `<filepath>` before code exists: completeness, ordering, ambiguity, scope, risk, per-step verification, rollback, grounding. Read-only single pass — no PR, no git, no code edits, no fix loop. See Plan Review Mode. |
-| `fix-plan` | *(none — plan edits authorized)* | Critique a plan/design file at `<filepath>`, then revise it in place to address findings; loop review → revise → re-score until `5/5` or `--max-iterations` (default `5`). Backs up to `<filepath>.orig`; edits only the plan file — never code, git, commit, or push. See Plan Fix Mode. |
+| `review` | `--dry-run` | Read-only. **Code target:** collect evidence, classify, plan fixes — no edits, commits, push, or comment resolution; accepts a `local`/`staged`/`worktree` target. **Plan target** (a `.md` plan, or `--as-plan`): critique the plan document (completeness, ordering, ambiguity, scope, risk, per-step verification, rollback, grounding) — no PR, no git, no fix loop, never rewrites the file (see Plan Review Mode). Mode auto-detected (see Target Auto-Detection); prints `detected: code review` / `detected: plan review`. |
+| `fix` | `--no-push` | **Code target:** review → fix safe issues → verify locally; no push unless `--push`; accepts a `local`/`staged`/`worktree` target (never pushes in local mode). **Plan target** (a `.md` plan, or `--as-plan`): critique then revise the plan file *in place*, looping review → revise → re-score until `5/5` or `--max-iterations` (default `5`); backs up to `<filepath>.orig`; edits only the plan file — never code, git, commit, or push (see Plan Fix Mode). Mode auto-detected; prints `detected: code fix` / `detected: plan fix`. |
+| `prepare` | *(none — full prep authorized)* | Code only. **PR:** Review → fix → verify → commit/push when verified. **Local** (`local`/`staged`/`worktree`): loop review → fix → verify until clean (`5/5`) or `--max-iterations` (default `5`), stop at `5/5`; never commits or pushes (no PR). |
+| `security` | `--dry-run --security-focus` | Code only. Read-only security-focused pass. Accepts a `local`/`staged`/`worktree` target. |
+| `status` | `--dry-run` | Code only. Quick merge-readiness snapshot: status, confidence score, blocking findings only — no fix plan. PR only. |
 | `help` | — | Print the slash-command reference; do not run the loop. |
+
+Hidden back-compat aliases (not advertised in `help`): `review-plan <filepath>` ≡
+`review <filepath> --as-plan`; `fix-plan <filepath>` ≡ `fix <filepath> --as-plan`
+(see Hidden Aliases).
 
 ### Flag mapping
 
 | Slash flag | Skill flag |
 |------------|------------|
+| `--as-code` | force **code** mode on `review`/`fix` (override the target detector) |
+| `--as-plan` | force **plan** mode on `review`/`fix` (override the detector; invalid on a PR/`local`/`staged`/`worktree` target) |
 | `--comment` | `--post-review` (requires explicit user authorization before posting) |
 | `--reply` | `--reply-comments` (requires explicit user authorization before posting) |
 | `--resolve` | `--resolve-replied` (requires `--reply` and explicit user authorization) |
@@ -184,18 +246,20 @@ snapshot).
 | `--dry-run` | `--dry-run` |
 
 Default iterations: `3`. Hard max: `5` unless the user explicitly overrides in
-chat. **Exception:** `prepare` on a local target and `fix-plan` both default to
+chat. **Exception:** `prepare` on a local target and `fix` in plan mode (a `.md`
+plan target / `--as-plan` / the `fix-plan` alias) both default to
 `--max-iterations 5` (they loop to clean readiness), still capped at the hard max
 of `5`.
 
 ### PR resolution
 
 0. **Not a PR** — handle these before any PR detection:
-   - `review-plan` / `fix-plan` → the argument is a `<filepath>`. Skip PR
+   - **Plan mode** (target auto-detected as a `.md` plan, the `--as-plan` flag, or
+     the `review-plan` / `fix-plan` alias) → the argument is a `<filepath>`. Skip PR
      detection and both preflight phases' PR machinery; enter Plan Review Mode
-     (`review-plan`, read-only) or Plan Fix Mode (`fix-plan`, revises the file) against
-     that file (see those sections). Halt with a one-line error if no filepath is
-     given or the file does not exist.
+     (`review`, read-only) or Plan Fix Mode (`fix`, revises the file) against that
+     file (see those sections). Halt with a one-line error if no filepath is given
+     or the file does not exist.
    - `local`, `staged`, or `worktree` → skip PR detection and the Phase 2
      PR-context gate entirely; enter Local (Uncommitted) Review Mode with the
      matching diff scope (`local`/`worktree` = vs `HEAD` + untracked; `staged` =
@@ -217,18 +281,23 @@ If resolution fails, halt with a `blocked` report; do not guess.
 
 ### Expansion examples
 
+Each `review`/`fix` line shows the auto-detected mode banner it must print.
+
 ```text
 /diffwarden review #123
-→ Use diffwarden on PR <resolved-url> --dry-run
+→ detected: code review. Use diffwarden on PR <resolved-url> --dry-run
 
 /diffwarden review local
-→ Use diffwarden on the uncommitted working tree (vs HEAD + untracked) --dry-run
+→ detected: code review. Use diffwarden on the uncommitted working tree (vs HEAD + untracked) --dry-run
 
 /diffwarden review staged
-→ Use diffwarden on the staged changes (git diff --cached) --dry-run
+→ detected: code review. Use diffwarden on the staged changes (git diff --cached) --dry-run
+
+/diffwarden review
+→ detected: code review. Use diffwarden on the current branch PR (or working tree) --dry-run
 
 /diffwarden fix local --security
-→ Use diffwarden on the uncommitted working tree --no-push --security-focus (local mode never pushes)
+→ detected: code fix. Use diffwarden on the uncommitted working tree --no-push --security-focus (local mode never pushes)
 
 /diffwarden prepare local
 → Use diffwarden on the uncommitted working tree --no-push --max-iterations 5,
@@ -236,19 +305,19 @@ If resolution fails, halt with a `blocked` report; do not guess.
   (local mode never commits or pushes)
 
 /diffwarden review #123 --comment
-→ Use diffwarden on PR <resolved-url> --dry-run --post-review
+→ detected: code review. Use diffwarden on PR <resolved-url> --dry-run --post-review
 
 /diffwarden fix
-→ Use diffwarden on the current PR --no-push
+→ detected: code fix. Use diffwarden on the current PR --no-push
 
 /diffwarden fix #123 --security --max 5
-→ Use diffwarden on PR <resolved-url> --no-push --security-focus --max-iterations 5
+→ detected: code fix. Use diffwarden on PR <resolved-url> --no-push --security-focus --max-iterations 5
 
 /diffwarden prepare #123 --comment
 → Use diffwarden on PR <resolved-url> --post-review
 
 /diffwarden fix #123 --reply
-→ Use diffwarden on PR <resolved-url> --no-push --reply-comments
+→ detected: code fix. Use diffwarden on PR <resolved-url> --no-push --reply-comments
 
 /diffwarden prepare #123 --reply --resolve
 → Use diffwarden on PR <resolved-url> --reply-comments --resolve-replied
@@ -259,21 +328,35 @@ If resolution fails, halt with a `blocked` report; do not guess.
 /diffwarden status
 → Use diffwarden on the current PR --dry-run. Report Diffwarden version (frontmatter `version:`), status, confidence score, and blocking findings only — no fix plan.
 
-/diffwarden review-plan docs/plan.md
-→ Use diffwarden in Plan Review Mode on docs/plan.md (read-only critique; no PR,
-  no git, no code edits, no fix loop)
+# Plan targets: a single prose .md auto-detects plan mode.
+/diffwarden review docs/plan.md
+→ detected: plan review. Use diffwarden in Plan Review Mode on docs/plan.md
+  (read-only critique; no PR, no git, no code edits, no fix loop)
 
-/diffwarden review-plan docs/plan.md --security
-→ Use diffwarden in Plan Review Mode on docs/plan.md --security-focus
+/diffwarden review docs/plan.md --security
+→ detected: plan review. Use diffwarden in Plan Review Mode on docs/plan.md --security-focus
   (prioritize auth, secrets, data-loss, injection, destructive steps in the plan)
 
-/diffwarden fix-plan docs/plan.md
-→ Use diffwarden in Plan Fix Mode on docs/plan.md (revise the plan file in place,
-  loop review → revise → re-score to 5/5 or --max-iterations 5; backup to
-  docs/plan.md.orig; no PR, no git, no code edits, no commit/push)
+/diffwarden review docs/plan.md --as-code
+→ detected: code review. Use diffwarden to review docs/plan.md as a code change
+  (diff review of the file), not as a plan critique (--as-code overrides the detector)
 
-/diffwarden fix-plan docs/plan.md --security --max 3
-→ Use diffwarden in Plan Fix Mode on docs/plan.md --security-focus --max-iterations 3
+/diffwarden fix docs/plan.md
+→ detected: plan fix. Use diffwarden in Plan Fix Mode on docs/plan.md (revise the
+  plan file in place, loop review → revise → re-score to 5/5 or --max-iterations 5;
+  backup to docs/plan.md.orig; no PR, no git, no code edits, no commit/push)
+
+/diffwarden fix docs/plan.md --as-plan --security --max 3
+→ detected: plan fix. Use diffwarden in Plan Fix Mode on docs/plan.md --security-focus --max-iterations 3
+
+# Mixed signals → ask first; default is code.
+/diffwarden review #123 docs/plan.md
+→ Ask the user: code review of PR #123, or plan review of docs/plan.md?
+  (default: code review if no choice is given)
+
+# Hidden back-compat aliases (not advertised; expand to the --as-plan form):
+/diffwarden review-plan docs/plan.md   → detected: plan review (= review docs/plan.md --as-plan)
+/diffwarden fix-plan docs/plan.md      → detected: plan fix    (= fix docs/plan.md --as-plan)
 ```
 
 ### Invalid combinations
@@ -293,11 +376,11 @@ Reject with a one-line reason; suggest the correct command:
 | `status local` | No PR to snapshot | `review local` |
 | `* local --comment` / `--reply` / `--resolve` | No PR threads to post to | drop the flag; reply/resolve once a PR exists |
 | `fix local --push` | No PR/remote branch to push in local mode | `fix local` (local only) |
-| `review-plan` / `fix-plan` with no filepath | A plan file is required | `review-plan <filepath>` or `fix-plan <filepath>` |
-| `review-plan` / `fix-plan` with a `<pr>` / `local` / `staged` / `worktree` | Plan modes read a file, not a PR or the working tree | `review-plan <filepath>` or `fix-plan <filepath>` |
-| `review-plan … --comment` / `--reply` / `--resolve` / `--push` | No PR and no code change to post or push | drop the flag (plan review is read-only) |
-| `fix-plan … --comment` / `--reply` / `--resolve` / `--push` | No PR and no thread to post to; fix-plan edits only the plan file | drop the flag |
-| `fix-plan … --dry-run` | Contradiction: fix-plan revises the plan in place | `review-plan` (read-only critique) |
+| `--as-code` and `--as-plan` together | Mutually exclusive overrides | pick one |
+| `--as-plan` on a `<pr>` / `local` / `staged` / `worktree` target | A PR or working tree is not a plan document | drop `--as-plan`, or pass a `.md` plan path |
+| `--as-plan` / `review`-detected-plan with no filepath | Plan mode needs an existing file | `review <filepath>` / `fix <filepath>` |
+| `prepare` / `security` / `status` on a `.md` plan or `--as-plan` | Code-only; no plan equivalent | `review <plan.md>` (critique) or `fix <plan.md>` (revise) |
+| plan-mode `review`/`fix` … `--comment` / `--reply` / `--resolve` / `--push` | No PR and no thread to post or push; plan `fix` edits only the plan file | drop the flag (plan modes touch no PR) |
 | `* --max N` where N > 5 | Hard cap | `--max 5` or ask user to override explicitly |
 
 ### Help output
@@ -308,26 +391,29 @@ When subcommand is `help` or the message is bare `/diffwarden` / `/dw`, reply wi
 ```text
 Diffwarden vX.Y.Z — slash commands (/diffwarden or /dw):
 
-  review [<pr>] [--comment] [--security] [--delegate] [--max N]
+  review [<target>] [--as-code|--as-plan] [--comment] [--security] [--delegate] [--max N]
                                                      read-only review (default: no PR comments)
-  fix [<pr>] [--reply] [--resolve] [--security] [--delegate] [--max N] [--push]
+  fix [<target>] [--as-code|--as-plan] [--reply] [--resolve] [--security] [--delegate] [--max N] [--push]
                                                      apply fixes locally (default: no push)
   prepare [<pr>] [--comment] [--reply] [--resolve] [--security] [--delegate] [--max N]
                                                      fix, verify, commit, and push
   security [<pr>] [--comment] [--max N]              security-focused read-only review
   status [<pr>]                                      quick merge-readiness snapshot
-  review-plan <filepath> [--security] [--delegate]   critique a plan/design file (read-only, no PR)
-  fix-plan <filepath> [--security] [--delegate] [--max N]
-                                                     revise a plan file in place to address findings (loops to 5/5)
   help                                               this message
+
+review and fix auto-detect the target: a PR / local diff → code mode; a single
+prose .md plan → plan mode (critique, or in-place revise for fix). Each run prints
+the chosen mode: "detected: code review | plan review | code fix | plan fix".
+--as-code / --as-plan force the mode. prepare/security/status are code-only.
 
 Flags: --comment = post new review; --reply = reply on existing review threads;
        --resolve = resolve threads after fixed replies (needs --reply + your OK);
        --delegate = let read-only subagents digest bulk reads (never on security runs/files)
 
-<pr>: #123, 123, current, full PR URL, or omit for current branch PR
-      local | staged | worktree = review uncommitted changes, no PR
+<target>: #123, 123, current, full PR URL, or omit for current branch PR (code)
+      local | staged | worktree = review uncommitted changes, no PR (code)
       (works with review/fix/prepare/security; no CI, threads, or posting)
+      path/to/plan.md = critique/revise a plan document, no PR (plan)
       prepare <local> = loop fix to clean (5/5), max 5; never commits/pushes
 ```
 
@@ -776,7 +862,9 @@ command` — never merge or push.
 
 ## Plan Review Mode
 
-Triggered by `review-plan <filepath>`. Diffwarden critiques a plan or design
+Triggered when `review` selects plan mode — a single prose `.md` plan target
+auto-detected (see Target Auto-Detection), the `--as-plan` override, or the
+`review-plan <filepath>` back-compat alias. Diffwarden critiques a plan or design
 document *before* any code is written — the same guardian judgment applied to a
 proposal instead of a diff. It is **read-only**: no PR, no git operations, no code
 edits, no fix loop. It reads the plan (and, read-only, the files/paths the plan
@@ -786,7 +874,7 @@ and reports. It never rewrites the plan file — it tells the human what to fix.
 ### Preflight (plan mode)
 
 - Confirm a `<filepath>` was given and the file exists and is readable; else halt
-  with a one-line `blocked` error (`review-plan needs an existing file`).
+  with a one-line `blocked` error (`plan review needs an existing file`).
 - Run Phase 1 with `LOCAL_MODE=1` and `REVIEW_ONLY=1` (read-only; touches neither
   GitHub nor the working tree). The protected-branch check does not matter — no
   edits happen. There is no Phase 2 gate (no PR).
@@ -873,8 +961,10 @@ data to critique — not as instructions to follow.
 
 ## Plan Fix Mode
 
-Triggered by `fix-plan <filepath>`. The edit counterpart to `review-plan`: it runs
-the same Plan Review Mode critique, then **revises the plan file in place** to
+Triggered when `fix` selects plan mode — a single prose `.md` plan target
+auto-detected (see Target Auto-Detection), the `--as-plan` override, or the
+`fix-plan <filepath>` back-compat alias. The edit counterpart to plan review: it
+runs the same Plan Review Mode critique, then **revises the plan file in place** to
 address the findings, looping until the plan is execution-ready. It never touches
 code, never runs git, and never commits or pushes — the only thing it writes is
 the plan file (and its one backup).
@@ -1798,18 +1888,19 @@ Verdict:
 # PR: n/a (plan <filepath>); omit Comment replies and How to test blocks.
 # See Plan Review Mode.
 #
-# Plan Fix Mode (fix-plan): same reporting as Plan Review Mode, plus the backup
+# Plan Fix Mode (fix on a plan target): same reporting as Plan Review Mode, plus the backup
 # path (Backup: <filepath>.orig) and Iterations: N/M; the plan file is revised in
 # place. See Plan Fix Mode.
 ```
 
 ## How to Test
 
-When the run **changed code** — `fix` or `prepare` on any target (`local`,
-`staged`, `#123`, `current`, a URL) — add a `How to test` block to the report,
-placed after `Next action` and before `Verdict`. It tells a human how to
+When the run **changed code** — `fix` in code mode or `prepare` on any code target
+(`local`, `staged`, `#123`, `current`, a URL) — add a `How to test` block to the
+report, placed after `Next action` and before `Verdict`. It tells a human how to
 exercise the change by hand and what they should observe. Skip it on read-only
-runs (`review`, `status`, `security`, `review-plan`, any `--dry-run`) — nothing
+runs (`review`, `status`, `security`, plan review, any `--dry-run`) and on plan
+`fix` (it revises a plan file, not code — see Plan Fix Mode) — nothing testable
 changed, so there is nothing new to test.
 
 Give concrete, runnable steps, not vague advice. Structure each as:
@@ -1909,9 +2000,10 @@ PR is a public, misleading claim. Ground it or omit it.
 Before final answer:
 
 - [ ] If invoked via `/diffwarden` or `/dw`, command parsed and expanded to skill flags before the loop.
+- [ ] `review`/`fix` target auto-detected (code vs plan) per Target Auto-Detection; `--as-code`/`--as-plan` honored as overrides; mixed signals asked (default code, not silently guessed); the `detected: code review | plan review | code fix | plan fix` banner printed before work; `review-plan`/`fix-plan` accepted only as hidden `--as-plan` aliases.
 - [ ] Local mode (`local`/`staged`/`worktree`): used with `review`/`fix`/`prepare`/`security` only; PR detection, CI, threads, posting, commit, and push all skipped; `prepare`-local looped to `5/5` or its `--max-iterations` (default `5`); diff scope correct (vs HEAD + untracked, or staged); confidence reported with `checks: n/a (local)`.
-- [ ] Plan Review Mode (`review-plan <filepath>`): filepath given and file exists (else halted); read-only — no PR, no git ops, no code edits, no fix loop, plan file never rewritten; references grounded read-only against the repo; findings classified with severity; plan-readiness `N/5` reported with `checks: n/a (plan)` and `PR: n/a (plan <filepath>)`; no `--comment`/`--reply`/`--resolve`/`--push`.
-- [ ] Plan Fix Mode (`fix-plan <filepath>`): filepath given and file exists (else halted); original backed up to `<filepath>.orig` (or `.orig.N`, never overwriting an existing backup) before the first edit; only the plan file edited — no code, no git, no commit/push; looped review → revise → re-score to `5/5` or `--max-iterations` (default `5`); plan not weakened to raise the score; needs-user findings left flagged, never invented; reported with `Plan-readiness: N/5`, `Backup:` path, `Iterations: N/M`, and `PR: n/a (plan <filepath>)`; no `--comment`/`--reply`/`--resolve`/`--push`/`--dry-run`.
+- [ ] Plan Review Mode (`review` on a `.md` plan / `--as-plan` / `review-plan` alias): filepath given and file exists (else halted); read-only — no PR, no git ops, no code edits, no fix loop, plan file never rewritten; references grounded read-only against the repo; findings classified with severity; plan-readiness `N/5` reported with `checks: n/a (plan)` and `PR: n/a (plan <filepath>)`; no `--comment`/`--reply`/`--resolve`/`--push`.
+- [ ] Plan Fix Mode (`fix` on a `.md` plan / `--as-plan` / `fix-plan` alias): filepath given and file exists (else halted); original backed up to `<filepath>.orig` (or `.orig.N`, never overwriting an existing backup) before the first edit; only the plan file edited — no code, no git, no commit/push; looped review → revise → re-score to `5/5` or `--max-iterations` (default `5`); plan not weakened to raise the score; needs-user findings left flagged, never invented; reported with `Plan-readiness: N/5`, `Backup:` path, `Iterations: N/M`, and `PR: n/a (plan <filepath>)`; no `--comment`/`--reply`/`--resolve`/`--push`/`--dry-run`.
 - [ ] GitHub auth resolved: gh user login preferred (env tokens unset when user active); else valid env token; no token search.
 - [ ] Phase 1 preflight gate passed (env); halted on failure.
 - [ ] `OWNER/REPO` resolved from the PR reference (not implicit cwd repo); substituted into all `gh api`/`gh pr` calls.

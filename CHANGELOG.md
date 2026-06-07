@@ -4,6 +4,43 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.20.0] - 2026-06-07
+
+### Changed
+
+- **Collapsed the plan subcommand surface into auto-detected `review` / `fix`.**
+  There is now **one** `review` and **one** `fix`; each classifies its *target*
+  and selects the matching internal mode — a PR / `#num` / URL / `current` /
+  `local` / `staged` / `worktree` → **code** mode; a single prose `.md` plan
+  (headings/sections, no diff payload) → **plan** mode. The code-review and
+  plan-review rubric logic is unchanged — only the entrypoint collapses.
+- Mixed signals (e.g. a PR ref *and* a `.md` plan path, or a `.md` carrying diff
+  hunks) → Diffwarden **asks** which mode and states that the default is **code**;
+  it never silently guesses.
+
+### Added
+
+- **`--as-code` / `--as-plan` override flags** on `review` / `fix` to force the
+  mode past the detector. They are mutually exclusive, and `--as-plan` is rejected
+  on a PR / `local` / `staged` / `worktree` target (not a plan document).
+- **Mandatory mode banner.** Every `review` / `fix` run prints the auto-selected
+  mode before working: `detected: code review | plan review | code fix | plan fix`.
+- Updated the grammar, Target Auto-Detection section, subcommand and flag-mapping
+  tables, expansion examples, Invalid-combinations table, help output, Plan
+  Review/Fix Mode triggers, How-to-Test scope, and the Verification Checklist.
+  Synced the `/dw` and `/diffwarden` command files and the README (new
+  "Auto-detected mode (code vs plan)" section, command/flag tables).
+
+### Kept
+
+- **Hidden back-compat aliases.** `review-plan <filepath>` ≡ `review <filepath>
+  --as-plan` and `fix-plan <filepath>` ≡ `fix <filepath> --as-plan` are still
+  accepted — expanded internally, not advertised in `help`.
+- The full safety stance is unchanged: no auto-merge, no force-push, no blind
+  push, no weakening of CI/tests/lint/auth/secrets, and no resolving human
+  comments without explicit approval. Plan mode still touches no PR, git, or code
+  (plan `review` is read-only; plan `fix` edits only the plan file).
+
 ## [0.19.0] - 2026-06-06
 
 ### Added

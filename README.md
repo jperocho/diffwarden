@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.19.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.20.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -11,6 +11,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 - [Command reference](#command-reference)
 - [Review uncommitted changes (no PR)](#review-uncommitted-changes-no-pr)
+- [Auto-detected mode (code vs plan)](#auto-detected-mode-code-vs-plan)
 - [Loop until merge-ready (5/5)](#loop-until-merge-ready-55)
 - [What it actually does](#what-it-actually-does)
 - [Is this for me?](#is-this-for-me)
@@ -29,15 +30,15 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). PR arg: `#123`, `123`, full URL, `current`, or omit (current branch PR). Or pass a local target — `local`, `staged`, or `worktree` — to review **uncommitted changes with no PR** (see [Review uncommitted changes](#review-uncommitted-changes-no-pr)). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). There is **one** `review` and **one** `fix`; both auto-detect the target. Target arg: a PR (`#123`, `123`, full URL, `current`, or omit for the current branch PR), a local target — `local`, `staged`, or `worktree` — to review **uncommitted changes with no PR** (see [Review uncommitted changes](#review-uncommitted-changes-no-pr)), or a single prose `.md` plan file to **critique/revise a plan before coding** (see [Auto-detected mode](#auto-detected-mode-code-vs-plan)). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs the command files — the installer copies them by default; with a manual copy you copy them yourself. Other agents: type `/diffwarden review` as chat text, or use natural language when the skill is loaded.
 
 | Command | What it does |
 |---------|--------------|
-| `/diffwarden review [<pr>]` | Read-only review + fix plan. No edits, commits, or push. |
+| `/diffwarden review [<target>]` | Read-only review + fix plan. No edits, commits, or push. Auto-detects code vs plan target; prints `detected: code review` / `detected: plan review`. |
 | `/diffwarden review [<pr>] --comment` | Same, plus post `COMMENT`-only GitHub review (your OK each run). |
-| `/diffwarden fix [<pr>]` | Fix safe issues locally + verify. No push. |
+| `/diffwarden fix [<target>]` | Fix safe issues locally + verify. No push. Auto-detects code vs plan target; prints `detected: code fix` / `detected: plan fix`. |
 | `/diffwarden fix [<pr>] --push` | Fix locally, commit + push when verified. |
 | `/diffwarden fix [<pr>] --reply` | Fix locally + reply on reviewer threads (your OK). |
 | `/diffwarden fix [<pr>] --reply --resolve` | Fix + thread replies + resolve fixed threads (your OK). |
@@ -47,8 +48,9 @@ Invoke with `/diffwarden` (or the optional `/dw` alias). PR arg: `#123`, `123`, 
 | `/diffwarden security [<pr>]` | Read-only security-focused pass. |
 | `/diffwarden security [<pr>] --comment` | Security pass + post findings on PR. |
 | `/diffwarden status [<pr>]` | Quick merge-readiness snapshot (checks, score, blockers). |
-| `/diffwarden review-plan <file>` | Critique a plan/design file before coding (read-only, no PR). |
-| `/diffwarden fix-plan <file>` | Revise a plan file in place to address findings (loops to 5/5; backs up to `<file>.orig`). |
+| `/diffwarden review <plan.md>` | Critique a plan/design file before coding (read-only, no PR). Plan mode auto-detected from the `.md` target. |
+| `/diffwarden fix <plan.md>` | Revise a plan file in place to address findings (loops to 5/5; backs up to `<plan>.orig`). Plan mode auto-detected. |
+| `/diffwarden review <plan.md> --as-code` | Force code (diff) review of a `.md` file instead of plan critique. |
 | `/diffwarden review local` | Review uncommitted changes (vs `HEAD` + untracked), no PR. |
 | `/diffwarden review staged` | Review staged changes only, no PR. |
 | `/diffwarden fix local` | Fix safe issues in the working tree (no commit, no push). |
@@ -57,6 +59,8 @@ Invoke with `/diffwarden` (or the optional `/dw` alias). PR arg: `#123`, `123`, 
 
 | Flag | Effect |
 |------|--------|
+| `--as-code` | On `review`/`fix`: force code mode (override the target detector). |
+| `--as-plan` | On `review`/`fix`: force plan mode. Invalid on a PR / `local` / `staged` / `worktree` target. |
 | `--comment` | Post new `COMMENT` review (never approve or request changes). |
 | `--reply` | Reply on existing reviewer threads (`fixed`, `defer`, `wontfix`, …). |
 | `--resolve` | Resolve threads after `fixed` / `already-addressed` replies (needs `--reply` + OK). |
@@ -90,6 +94,42 @@ CI, review/issue comments, posting (`--comment`/`--reply`/`--resolve`), and any
 commit or push (`fix local` edits the working tree only). The confidence score
 reports `checks: n/a (local)` and reflects readiness-to-commit. `prepare`,
 `status`, and posting/push flags are rejected with a local target.
+
+## Auto-detected mode (code vs plan)
+
+`review` and `fix` are single commands that work on **either** code or a plan
+document. Diffwarden classifies the *target* and runs the matching mode — you do
+not pick a separate subcommand. Every run prints the mode it chose:
+`detected: code review | plan review | code fix | plan fix`.
+
+| Target | Detected mode |
+|--------|---------------|
+| `#123`, `123`, full PR URL, `current`, or omitted | code |
+| `local`, `staged`, `worktree` | code |
+| a single prose `.md` plan file (headings/sections, no diff) | plan |
+| `--as-code` flag | code (forced) |
+| `--as-plan` flag | plan (forced) |
+| **mixed** signals (e.g. a PR *and* a `.md` plan) | **asks you; default code** |
+
+```text
+/dw review #123            # detected: code review
+/dw review                 # detected: code review (current branch / worktree)
+/dw review docs/plan.md    # detected: plan review (critique a plan, no PR)
+/dw review docs/plan.md --as-code   # detected: code review (review the file as a diff)
+/dw fix #123               # detected: code fix
+/dw fix docs/plan.md       # detected: plan fix (revise the plan in place, no PR)
+/dw fix docs/plan.md --as-plan      # detected: plan fix (explicit)
+```
+
+`--as-code` / `--as-plan` override the detector; on a mix of signals Diffwarden
+**asks first** (defaulting to code only if you don't choose) — it never silently
+guesses. Plan mode never touches a PR, git, or code: plan `review` is a read-only
+critique; plan `fix` revises only the plan file (backing up to `<plan>.orig`) and
+never commits or pushes. `prepare`, `security`, and `status` are code-only.
+
+> The older `review-plan` / `fix-plan` names still work as **hidden back-compat
+> aliases** (equivalent to `review` / `fix <file> --as-plan`), but `review` /
+> `fix` on a `.md` file is the way to invoke plan mode now.
 
 ## Loop until merge-ready (5/5)
 
@@ -241,7 +281,7 @@ files already up to date, and never overwrites a changed file without asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.19.0/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.20.0/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -393,6 +433,7 @@ Add these after the command. Combine freely.
 
 | Flag | What it does |
 |------|--------------|
+| `--as-code` / `--as-plan` | Force `review`/`fix` into code or plan mode, overriding the [target detector](#auto-detected-mode-code-vs-plan). |
 | `--dry-run` | Review and plan only. No edits, commits, pushes, or comments. **Start here.** |
 | `--no-push` | Apply fixes locally but never push them. |
 | `--security-focus` | Prioritize security: auth, injection, SSRF, secrets, path traversal, crypto, data loss. |
@@ -544,4 +585,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.19.0`
+Current version: `v0.20.0`
