@@ -1,7 +1,7 @@
 ---
 name: diffwarden
-description: "Use when preparing a pull request for merge, or reviewing uncommitted local changes: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands."
-version: 0.21.0
+description: "Use when preparing a pull request for merge, or reviewing uncommitted local changes: inspect diffs, collect checks and review comments, classify findings, fix safe issues, verify, and loop until merge-ready. Supports /diffwarden and /dw slash commands in Claude Code and Cursor; Codex CLI uses $diffwarden or /skills."
+version: 0.23.2
 author: jperocho
 license: MIT
 metadata:
@@ -60,7 +60,7 @@ scope, safety gates, or the loop algorithm.
 
 Use Diffwarden when the user asks to:
 
-- invoke a `/diffwarden` or `/dw` slash command (see Slash Commands)
+- invoke `/diffwarden`, `/dw`, or `$diffwarden` (Codex) — see Slash Commands
 - review uncommitted local changes before committing or opening a PR (see Local (Uncommitted) Review Mode)
 - check a PR before merge
 - address review feedback
@@ -113,21 +113,32 @@ Future platforms:
 
 ## Slash Commands
 
-When the user message starts with `/diffwarden` or `/dw`, treat it as a
-Diffwarden invocation. Parse the command, expand to the skill flags below, then
-run the full Diffwarden loop. Do not ask the user to rephrase unless parsing
-fails or flags contradict each other.
+When the user message starts with `/diffwarden`, `/dw`, or `$diffwarden`, treat
+it as a Diffwarden invocation. Parse the command, expand to the skill flags
+below, then run the full Diffwarden loop. Do not ask the user to rephrase unless
+parsing fails or flags contradict each other.
 
-**Cursor `/` menu:** optional Cursor-only step. Copy `skills/diffwarden/commands/*.md`
-to `.cursor/commands/` or `~/.cursor/commands/`. Without those files, the user
-can still type `/dw review` as plain chat text when this skill is loaded. Not
-required for non-Cursor agents.
+**Per-agent invocation:**
+
+| Agent | Supported | Not supported (and why) |
+| --- | --- | --- |
+| Claude Code | `/diffwarden` (skill name); `/dw` with command files in `.claude/commands/` | — |
+| Cursor | `/diffwarden` and `/dw` with command files in `.cursor/commands/` | — |
+| Codex CLI | `$diffwarden <args>`; `/skills` picker; plain chat when this skill is loaded | `/diffwarden`, `/dw` — Codex `/` menu is built-in commands only; custom slash commands are not loaded from skill or command files ([openai/codex#11817](https://github.com/openai/codex/issues/11817)). `/prompts:dw`, `/prompts:diffwarden` — custom prompts in `~/.codex/prompts/` were removed in the **March 2026 Codex release** (0.117 series); OpenAI deprecated them in favor of skills ([custom prompts docs](https://developers.openai.com/codex/custom-prompts)). |
+
+Claude Code and Cursor: copy `skills/diffwarden/commands/*.md` to
+`.claude/commands/` or `.cursor/commands/` (or the matching global directory).
+Codex CLI: install only `SKILL.md` to `.agents/skills/diffwarden/` or
+`~/.agents/skills/diffwarden/`. Invoke with `$diffwarden review`, `$diffwarden
+fix local`, etc., or pick the skill from `/skills`. Some Claude Code builds also
+register `/diffwarden` from the skill name without the command file.
 
 ### Grammar
 
 ```text
 /diffwarden <subcommand> [<target>] [flags]
 /dw <subcommand> [<target>] [flags]
+$diffwarden <subcommand> [<target>] [flags]   # Codex CLI
 
 <subcommand>  review | fix | prepare | security | status | help
 <target>      #123 | 123 | current | https://github.com/owner/repo/pull/N   → code
@@ -138,7 +149,7 @@ required for non-Cursor agents.
               | --security | --delegate | --web | --push | --max N | --dry-run
 ```
 
-Bare `/diffwarden` or `/dw` with no subcommand → same as `help`.
+Bare `/diffwarden`, `/dw`, or `$diffwarden` with no subcommand → same as `help`.
 
 There is **one** `review` and **one** `fix`. They auto-detect whether the target
 is *code* (a PR, a local diff) or a *plan* (a prose `.md` design doc) and select
@@ -399,11 +410,12 @@ Reject with a one-line reason; suggest the correct command:
 
 ### Help output
 
-When subcommand is `help` or the message is bare `/diffwarden` / `/dw`, reply with
+When subcommand is `help` or the message is bare `/diffwarden`, `/dw`, or
+`$diffwarden`, reply with
 (substitute `vX.Y.Z` with this skill's frontmatter `version:`):
 
 ```text
-Diffwarden vX.Y.Z — slash commands (/diffwarden or /dw):
+Diffwarden vX.Y.Z — commands (/diffwarden, /dw, or $diffwarden on Codex):
 
   review [<target>] [--as-code|--as-plan] [--comment] [--security] [--delegate] [--web] [--max N]
                                                      read-only review (default: no PR comments)
@@ -438,7 +450,7 @@ exists, append its single notice line. Then stop; do not run the loop.
 
 ## Version Check (bare invocation only)
 
-On the help path only — bare `/diffwarden` / `/dw` or the explicit `help`
+On the help path only — bare `/diffwarden`, `/dw`, `$diffwarden`, or the explicit `help`
 subcommand — do one **best-effort** check for a newer release and, if the local
 skill is behind, append a single notice line to the help output. This is the
 only place Diffwarden touches the network for its own version, and it is
@@ -2085,24 +2097,33 @@ a command that does not exist. When unsure whether a step is real, drop it.
 
 A change to `install.sh` (this repo's only executable). Every path and command
 below traces to real evidence — `install.sh` copies `SKILL.md` to
-`<root>/.claude/skills/diffwarden/` and command files to `.claude/commands/`,
-and refuses writes outside `.claude/`/`.cursor/`:
+`<root>/.claude/skills/diffwarden/` (or `.cursor/` / `.agents/skills/diffwarden/`
+for Codex), and Claude/Cursor command files to the matching host directory. It
+refuses writes outside `.claude/`, `.cursor/`, and `.agents/`:
 
 ```text
 How to test:
 - Setup: proj="$(mktemp -d)" && cd "$proj"   # empty project root
-- Exercise: bash /path/to/diffwarden/install.sh   # choose Claude Code, project scope
-- Expect:
-  - ls .claude/skills/diffwarden/SKILL.md          → present (skill installed)
+- Exercise: bash /path/to/diffwarden/install.sh   # choose one agent at project scope
+- Expect (Claude Code):
+  - ls .claude/skills/diffwarden/SKILL.md → present
   - ls .claude/commands/dw.md .claude/commands/diffwarden.md → both present
-  - grep '^version:' .claude/skills/diffwarden/SKILL.md      → matches DEFAULT_REF
+  - grep '^version:' .claude/skills/diffwarden/SKILL.md → matches DEFAULT_REF
   - find . -path ./.claude -prune -o -type f -print → nothing written outside .claude/
+- Expect (Codex):
+  - ls .agents/skills/diffwarden/SKILL.md → present
+  - find . -path ./.agents -prune -o -type f -print → nothing written outside .agents/
+- Expect (Cursor):
+  - ls .cursor/skills/diffwarden/SKILL.md → present
+  - ls .cursor/commands/dw.md .cursor/commands/diffwarden.md → both present
+  - find . -path ./.cursor -prune -o -type f -print → nothing written outside .cursor/
 - Optional (syntax/lint): bash -n install.sh → exit 0; shellcheck install.sh → clean
 ```
 
-Every path (`.claude/skills/diffwarden/SKILL.md`, `.claude/commands/dw.md`) and
-command (`install.sh`, `bash -n`, `shellcheck`) above is real because it traces
-to the changed code and this repo's layout — not because it sounds right.
+Every path (`.claude/skills/diffwarden/SKILL.md`,
+`.agents/skills/diffwarden/SKILL.md`, `.cursor/commands/dw.md`) and command
+(`install.sh`, `bash -n`, `shellcheck`) above is real because it traces to the
+changed code and this repo's layout — not because it sounds right.
 
 ### In PR comments
 
@@ -2140,7 +2161,7 @@ PR is a public, misleading claim. Ground it or omit it.
 
 Before final answer:
 
-- [ ] If invoked via `/diffwarden` or `/dw`, command parsed and expanded to skill flags before the loop.
+- [ ] If invoked via `/diffwarden`, `/dw`, or `$diffwarden`, command parsed and expanded to skill flags before the loop.
 - [ ] `review`/`fix` target auto-detected (code vs plan) per Target Auto-Detection; `--as-code`/`--as-plan` honored as overrides; mixed signals asked (default code, not silently guessed); the `detected: code review | plan review | code fix | plan fix` banner printed before work; `review-plan`/`fix-plan` accepted only as hidden `--as-plan` aliases.
 - [ ] Local mode (`local`/`staged`/`worktree`): used with `review`/`fix`/`prepare`/`security` only; PR detection, CI, threads, posting, commit, and push all skipped; `prepare`-local looped to `5/5` or its `--max-iterations` (default `5`); diff scope correct (vs HEAD + untracked, or staged); confidence reported with `checks: n/a (local)`.
 - [ ] Plan Review Mode (`review` on a `.md` plan / `--as-plan` / `review-plan` alias): filepath given and file exists (else halted); read-only — no PR, no git ops, no code edits, no fix loop, plan file never rewritten; references grounded read-only against the repo; findings classified with severity; plan-readiness `N/5` reported with `checks: n/a (plan)` and `PR: n/a (plan <filepath>)`; no `--comment`/`--reply`/`--resolve`/`--push`.

@@ -12,7 +12,7 @@ No source code, build step, or test suite.
 ```
 skills/diffwarden/SKILL.md     ← the product (PR-guardian playbook)
 skills/diffwarden/commands/    ← optional slash files (/dw, /diffwarden)
-install.sh                     ← installer (detects agents, copies skill + commands)
+install.sh                     ← installer (detects Claude/Cursor/Codex, copies skill + commands)
 README.md                      ← user-facing description / install / usage
 CHANGELOG.md                ← release notes (Keep a Changelog + SemVer)
 LICENSE                     ← MIT
@@ -58,9 +58,10 @@ Beyond CI, to "verify" a change:
 
 ## Distribution
 
-Installed via `install.sh` (detects Claude Code / Cursor, copies the skill +
-command files) or a manual copy — there is **no** `npx`/skills.sh path (it was
-flaky and has been removed). Do not re-add it without good reason.
+Installed via `install.sh` (detects Claude Code, Cursor, and Codex; copies the
+skill and Claude/Cursor command files; Codex gets the skill only under
+`.agents/skills/`) or a manual copy — there is **no** `npx`/skills.sh path (it
+was flaky and has been removed). Do not re-add it without good reason.
 
 The installer pins to a release tag (`DEFAULT_REF` in `install.sh`) and fetches
 from `raw.githubusercontent.com/...` when run outside a clone — **bump
@@ -69,4 +70,5 @@ installs the matching version. The source path `skills/diffwarden/SKILL.md` and
 `skills/diffwarden/commands/` is hard-coded in the installer — don't move it.
 
 Security stance for `install.sh`: keep `set -euo pipefail`, HTTPS-only fetch, no
-`sudo`, and the guard that refuses writes outside `.claude/` and `.cursor/`.
+`sudo`, and the guard that refuses writes outside `.claude/`, `.cursor/`, and
+`.agents/`.
