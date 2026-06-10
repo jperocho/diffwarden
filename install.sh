@@ -2,18 +2,21 @@
 #
 # Diffwarden installer.
 #
-# Places the Diffwarden skill and its optional /dw and /diffwarden slash-command
-# files into the right directories for the coding agents you choose (Claude Code
-# and/or Cursor), at project scope (current folder) and/or global scope (home).
+# Places the Diffwarden skill and its optional /dw and /diffwarden command files
+# into the right directories for the coding agents you choose (Claude Code,
+# Cursor, and/or Codex), at project scope (current folder) and/or global scope
+# (home). Codex reads skills from .agents/skills (invoke with $diffwarden or
+# /skills); it does not support custom /dw or /diffwarden slash commands.
 #
-# It only ever writes under .claude/ , ~/.claude/ , .cursor/ , and ~/.cursor/ .
-# It never uses sudo, never touches anything else, never overwrites a changed
-# file without asking, and skips files that are already up to date.
+# It only ever writes under .claude/ , ~/.claude/ , .cursor/ , ~/.cursor/ ,
+# .agents/ , and ~/.agents/ . It never uses sudo, never
+# touches anything else, never overwrites a changed file without asking, and
+# skips files that are already up to date.
 #
 # SECURITY: read this script before running it. The recommended way to install
 # is download-then-inspect-then-run, not pipe-to-shell. See the README.
 #
-#   curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.21.0/install.sh
+#   curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.23.2/install.sh
 #   less install.sh        # read it
 #   bash install.sh        # then run it
 #
@@ -25,6 +28,7 @@
 # Options:
 #   --claude            Install for Claude Code only.
 #   --cursor            Install for Cursor only.
+#   --codex             Install for Codex only.
 #                       (default: every agent whose config dir is detected)
 #   --project           Install at project scope only (current directory).
 #   --global            Install at global scope only ($HOME).
@@ -33,7 +37,7 @@
 #   -f, --force         Overwrite files that differ, without prompting.
 #   --dry-run           Print the plan and exit; write nothing.
 #   --ref <ref>         Git ref/tag to fetch from when run outside the repo
-#                       (default: v0.21.0). Ignored when run inside a clone.
+#                       (default: v0.23.2). Ignored when run inside a clone.
 #   -h, --help          Show this help and exit.
 
 set -euo pipefail
@@ -41,7 +45,7 @@ set -euo pipefail
 # --- constants ---------------------------------------------------------------
 
 SKILL_NAME="diffwarden"
-DEFAULT_REF="v0.21.0"
+DEFAULT_REF="v0.23.2"
 RAW_BASE="https://raw.githubusercontent.com/jperocho/diffwarden"
 COMMAND_FILES=("dw.md" "diffwarden.md")
 
@@ -49,6 +53,7 @@ COMMAND_FILES=("dw.md" "diffwarden.md")
 
 WANT_CLAUDE=""
 WANT_CURSOR=""
+WANT_CODEX=""
 SCOPE_PROJECT=""
 SCOPE_GLOBAL=""
 ASSUME_YES=0
@@ -56,12 +61,13 @@ FORCE=0
 DRY_RUN=0
 REF="${DW_REF:-$DEFAULT_REF}"
 
-usage() { sed -n '3,55p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,41p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --claude)  WANT_CLAUDE=1 ;;
     --cursor)  WANT_CURSOR=1 ;;
+    --codex)   WANT_CODEX=1 ;;
     --project) SCOPE_PROJECT=1 ;;
     --global)  SCOPE_GLOBAL=1 ;;
     -y|--yes)  ASSUME_YES=1 ;;
@@ -94,7 +100,12 @@ fi
 SRC_DIR=""        # directory containing SKILL.md and commands/
 TMP_DIR=""
 
-cleanup() { [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]] && rm -rf "$TMP_DIR"; }
+# shellcheck disable=SC2317 # Called by EXIT trap.
+cleanup() {
+  if [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]]; then
+    rm -rf "$TMP_DIR"
+  fi
+}
 trap cleanup EXIT
 
 resolve_source() {
@@ -137,37 +148,42 @@ GLOBAL_ROOT="$HOME"
 has_dir() { [[ -d "$1" ]]; }
 
 detect_summary() {
-  local c_proj="no" c_glob="no" u_proj="no" u_glob="no"
+  local c_proj="no" c_glob="no" u_proj="no" u_glob="no" x_proj="no" x_glob="no"
   has_dir "$PROJECT_ROOT/.claude" && c_proj="yes"
   has_dir "$GLOBAL_ROOT/.claude"  && c_glob="yes"
   has_dir "$PROJECT_ROOT/.cursor" && u_proj="yes"
   has_dir "$GLOBAL_ROOT/.cursor"  && u_glob="yes"
+  { has_dir "$PROJECT_ROOT/.codex" || has_dir "$PROJECT_ROOT/.agents"; } && x_proj="yes"
+  { has_dir "$GLOBAL_ROOT/.codex"  || has_dir "$GLOBAL_ROOT/.agents"; }  && x_glob="yes"
   info "Detected config dirs:"
   info "  Claude Code  project(.claude): $c_proj   global(~/.claude): $c_glob"
   info "  Cursor       project(.cursor): $u_proj   global(~/.cursor): $u_glob"
+  info "  Codex        project(.agents/.codex): $x_proj   global(~/.agents/~/.codex): $x_glob"
 }
 
 # Decide default agent set: if user forced neither, pick agents that have a dir
 # at the chosen scope; if none detected, ask (or, with -y, default to Claude).
 choose_agents() {
-  if [[ -n "$WANT_CLAUDE$WANT_CURSOR" ]]; then return; fi
-  local claude_seen=0 cursor_seen=0
-  [[ -n "$SCOPE_PROJECT" ]] && { has_dir "$PROJECT_ROOT/.claude" && claude_seen=1; has_dir "$PROJECT_ROOT/.cursor" && cursor_seen=1; }
-  [[ -n "$SCOPE_GLOBAL"  ]] && { has_dir "$GLOBAL_ROOT/.claude"  && claude_seen=1; has_dir "$GLOBAL_ROOT/.cursor"  && cursor_seen=1; }
-  if [[ $claude_seen -eq 0 && $cursor_seen -eq 0 ]]; then
+  if [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX" ]]; then return; fi
+  local claude_seen=0 cursor_seen=0 codex_seen=0
+  [[ -n "$SCOPE_PROJECT" ]] && { has_dir "$PROJECT_ROOT/.claude" && claude_seen=1; has_dir "$PROJECT_ROOT/.cursor" && cursor_seen=1; { has_dir "$PROJECT_ROOT/.codex" || has_dir "$PROJECT_ROOT/.agents"; } && codex_seen=1; }
+  [[ -n "$SCOPE_GLOBAL"  ]] && { has_dir "$GLOBAL_ROOT/.claude"  && claude_seen=1; has_dir "$GLOBAL_ROOT/.cursor"  && cursor_seen=1; { has_dir "$GLOBAL_ROOT/.codex" || has_dir "$GLOBAL_ROOT/.agents"; } && codex_seen=1; }
+  if [[ $claude_seen -eq 0 && $cursor_seen -eq 0 && $codex_seen -eq 0 ]]; then
     if [[ $ASSUME_YES -eq 1 ]]; then
       WANT_CLAUDE=1
       warn "No agent dirs detected; defaulting to Claude Code (--yes)."
     else
-      info "No Claude Code or Cursor config dir detected at the chosen scope."
+      info "No Claude Code, Cursor, or Codex config dir detected at the chosen scope."
       ask_yes_no "Install for Claude Code anyway?" && WANT_CLAUDE=1
       ask_yes_no "Install for Cursor anyway?"      && WANT_CURSOR=1
+      ask_yes_no "Install for Codex anyway?"       && WANT_CODEX=1
     fi
   else
     [[ $claude_seen -eq 1 ]] && WANT_CLAUDE=1
     [[ $cursor_seen -eq 1 ]] && WANT_CURSOR=1
+    [[ $codex_seen -eq 1 ]] && WANT_CODEX=1
   fi
-  [[ -n "$WANT_CLAUDE$WANT_CURSOR" ]] || die "No agents selected; nothing to do."
+  [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX" ]] || die "No agents selected; nothing to do."
 }
 
 ask_yes_no() {
@@ -190,7 +206,7 @@ install_file() {
 
   # Defense in depth: dest must live under a known root.
   case "$dest" in
-    "$PROJECT_ROOT"/.claude/*|"$PROJECT_ROOT"/.cursor/*|"$GLOBAL_ROOT"/.claude/*|"$GLOBAL_ROOT"/.cursor/*) ;;
+    "$PROJECT_ROOT"/.claude/*|"$PROJECT_ROOT"/.cursor/*|"$PROJECT_ROOT"/.agents/*|"$GLOBAL_ROOT"/.claude/*|"$GLOBAL_ROOT"/.cursor/*|"$GLOBAL_ROOT"/.agents/*) ;;
     *) die "Refusing to write outside known config dirs: $dest" ;;
   esac
 
@@ -237,6 +253,11 @@ install_target() {
       install_file "$SRC_DIR/commands/$f" "$root/.cursor/commands/$f"
     done
   fi
+  if [[ -n "$WANT_CODEX" ]]; then
+    info "Codex ($label):"
+    install_file "$SRC_DIR/SKILL.md" "$root/.agents/skills/$SKILL_NAME/SKILL.md"
+    info "  → invoke in Codex CLI with \$diffwarden <args> or /skills (not /dw or /diffwarden)."
+  fi
 }
 
 # --- run ---------------------------------------------------------------------
@@ -249,7 +270,7 @@ choose_agents
 
 info ""
 info "Plan:"
-info "  agents : ${WANT_CLAUDE:+Claude }${WANT_CURSOR:+Cursor}"
+info "  agents : ${WANT_CLAUDE:+Claude }${WANT_CURSOR:+Cursor }${WANT_CODEX:+Codex}"
 info "  scope  : ${SCOPE_PROJECT:+project($PROJECT_ROOT) }${SCOPE_GLOBAL:+global($GLOBAL_ROOT)}"
 [[ $DRY_RUN -eq 1 ]] && info "  (dry run — no files will be written)"
 info ""
@@ -263,6 +284,9 @@ fi
 
 info ""
 info "Done. installed=$INSTALLED  up-to-date=$SKIPPED  kept-existing=$KEPT"
-if [[ $DRY_RUN -ne 1 && $INSTALLED -gt 0 && -n "$WANT_CLAUDE" ]]; then
-  info "Claude Code loads skills/commands at session start — restart or /clear to pick them up."
+if [[ $DRY_RUN -ne 1 && $INSTALLED -gt 0 ]]; then
+  if [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX" ]]; then
+    info "Restart your agent session (or /clear in Codex) to pick up new skills/commands."
+  fi
 fi
+exit 0

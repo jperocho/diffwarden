@@ -45,4 +45,6 @@ coverage/
 # Agent IDE local config (not part of the distributable skill)
 .cursor/
 .claude/
+.codex/
+.agents/
 .cursor/rules/caveman.mdc

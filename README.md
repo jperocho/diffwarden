@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.21.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.23.2-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -19,6 +19,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 - [Prerequisites (do this first)](#prerequisites-do-this-first)
 - [Install](#install)
 - [Slash commands](#slash-commands)
+- [Codex CLI](#codex-cli)
 - [Your first run (step by step)](#your-first-run-step-by-step)
 - [Modes / flags](#modes--flags)
 - [Common recipes](#common-recipes)
@@ -33,7 +34,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 Invoke with `/diffwarden` (or the optional `/dw` alias). There is **one** `review` and **one** `fix`; both auto-detect the target. Target arg: a PR (`#123`, `123`, full URL, `current`, or omit for the current branch PR), a local target — `local`, `staged`, or `worktree` — to review **uncommitted changes with no PR** (see [Review uncommitted changes](#review-uncommitted-changes-no-pr)), or a single prose `.md` plan file to **critique/revise a plan before coding** (see [Auto-detected mode](#auto-detected-mode-code-vs-plan)). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
-**What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs the command files — the installer copies them by default; with a manual copy you copy them yourself. Other agents: type `/diffwarden review` as chat text, or use natural language when the skill is loaded.
+**What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs command files in Claude Code/Cursor. **Codex CLI is different** — see [Codex CLI](#codex-cli): use `$diffwarden` or `/skills`, not `/dw` or `/diffwarden`.
 
 | Command | What it does |
 |---------|--------------|
@@ -89,13 +90,13 @@ your project context, and the same review pipeline.
 /dw security local        # security-focused pass on uncommitted changes
 ```
 
-Valid only with `review`, `fix`, and `security`. Everything that defines a
+Valid with `review`, `fix`, `prepare`, and `security`. Everything that defines a
 review still runs — classification, severity, confidence score, fix loop,
 verification, security checklist. What's skipped (no PR exists): PR detection,
 CI, review/issue comments, posting (`--comment`/`--reply`/`--resolve`), and any
-commit or push (`fix local` edits the working tree only). The confidence score
-reports `checks: n/a (local)` and reflects readiness-to-commit. `prepare`,
-`status`, and posting/push flags are rejected with a local target.
+commit or push (`fix local` and `prepare local` edit the working tree only). The
+confidence score reports `checks: n/a (local)` and reflects readiness-to-commit.
+`status` and posting/push flags are rejected with a local target.
 
 ## Auto-detected mode (code vs plan)
 
@@ -273,7 +274,7 @@ Don't use it for: deploying to production, auto-merging, rewriting git history, 
 
 You need four things. Check each before installing.
 
-**1. A coding agent that can read skills and run shell commands.** Examples: Claude Code, GitHub Copilot CLI, Cursor, OpenCode. The installer targets Claude Code and Cursor directly; any other skill-loading agent works via manual copy ([Install](#install) Option C/D).
+**1. A coding agent that can read skills and run shell commands.** Examples: Claude Code, Codex, GitHub Copilot CLI, Cursor, OpenCode. The installer targets Claude Code, Codex, and Cursor directly; any other skill-loading agent works via manual copy ([Install](#install) Option C/D).
 
 **2. `git`.**
 
@@ -314,25 +315,28 @@ You also need to be inside a git repository that has an open GitHub pull request
 There is **no `npx`/skills.sh step** — that loader proved flaky, so Diffwarden
 installs with its own script or a plain copy. Both place the same files:
 
-- the skill itself → `<root>/.claude/skills/diffwarden/SKILL.md` (Claude Code)
-  and/or `<root>/.cursor/skills/diffwarden/SKILL.md` (Cursor),
+- the skill itself → `<root>/.claude/skills/diffwarden/SKILL.md` (Claude Code),
+  `<root>/.agents/skills/diffwarden/SKILL.md` (Codex), and/or
+  `<root>/.cursor/skills/diffwarden/SKILL.md` (Cursor),
 - the optional `/dw` and `/diffwarden` slash-command files → `<root>/.claude/commands/`
-  and/or `<root>/.cursor/commands/`,
+  and/or `<root>/.cursor/commands/` (Claude Code and Cursor only — Codex does not
+  use command files; see [Codex CLI](#codex-cli)),
 
 where `<root>` is your project folder (project scope) or `$HOME` (global scope).
 
 **Option A — installer (recommended).** It detects which agents you have, asks
-where to install, copies the skill + command files into the right places, skips
-files already up to date, and never overwrites a changed file without asking.
+where to install, copies the skill + command files into the right places,
+skips files already up to date, and never overwrites a changed file without
+asking.
 
 > **Security — inspect before you run.** Diffwarden is a safety tool; don't
 > pipe a script straight into a shell on its word. Download it, read it, then
 > run it. The installer pins to a release tag, uses HTTPS only, never uses
-> `sudo`, and only writes under `.claude/` and `.cursor/`.
+> `sudo`, and only writes under `.claude/`, `.cursor/`, and `.agents/`.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.21.0/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.23.2/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -346,14 +350,14 @@ Useful flags (see `./install.sh --help`):
 ```bash
 ./install.sh --dry-run            # show the plan, write nothing
 ./install.sh --claude --project   # Claude Code, current repo only
+./install.sh --codex --global     # Codex, all projects on this machine
 ./install.sh --cursor --global    # Cursor, all projects on this machine
 ./install.sh --yes                # non-interactive (accept detected defaults)
 ./install.sh --force              # overwrite differing files without prompting
 ```
 
 **Option B — manual copy.** Do exactly what the installer does, by hand. Pick a
-`<root>` (`.` for this project, `~` for global) and an agent dir (`.claude` or
-`.cursor`):
+`<root>` (`.` for this project, `~` for global) and the matching agent location:
 
 ```bash
 # Claude Code, project scope
@@ -362,6 +366,11 @@ cp skills/diffwarden/SKILL.md          .claude/skills/diffwarden/SKILL.md
 cp skills/diffwarden/commands/dw.md    .claude/commands/
 cp skills/diffwarden/commands/diffwarden.md .claude/commands/
 
+# Codex, project or global scope (same skill path; invoke with $diffwarden)
+mkdir -p .agents/skills/diffwarden
+cp skills/diffwarden/SKILL.md          .agents/skills/diffwarden/SKILL.md
+# global: mkdir -p ~/.agents/skills/diffwarden && cp ... ~/.agents/skills/diffwarden/
+
 # Cursor, project scope — same files under .cursor/
 mkdir -p .cursor/skills/diffwarden .cursor/commands
 cp skills/diffwarden/SKILL.md          .cursor/skills/diffwarden/SKILL.md
@@ -369,13 +378,11 @@ cp skills/diffwarden/commands/dw.md    .cursor/commands/
 cp skills/diffwarden/commands/diffwarden.md .cursor/commands/
 ```
 
-For global scope, swap the leading `.` for `~`. The `commands/` files are
-optional — `/diffwarden` and natural language work without them; copy them only
-if you want the `/dw` shorthand.
+For global Claude Code/Cursor scope, swap the leading `.` for `~`. For global
+Codex skills, use `~/.agents/skills/diffwarden/SKILL.md`.
 
-Claude Code loads skills and commands at session start — restart (or `/clear`)
-after installing. Then type `/` → pick `dw` or `diffwarden` → add args (e.g.
-`review #123`).
+Claude Code and Codex load skills at session start — restart (or `/clear` in
+Codex) after installing. Codex invocation details: [Codex CLI](#codex-cli).
 
 **Optional — caveman mode for token savings.** Diffwarden runs long review loops
 (diffs, CI logs, threads), so it pairs well with the [`caveman`](https://github.com/JuliusBrussee/caveman)
@@ -437,6 +444,41 @@ Natural-language equivalents:
 ```text
 Use diffwarden on the current PR --dry-run
 Use diffwarden on PR https://github.com/owner/repo/pull/123 --no-push
+```
+
+## Codex CLI
+
+Codex installs and runs Diffwarden as a **skill**, not as custom slash commands.
+The grammar is the same; only the prefix changes.
+
+### Supported
+
+| How | Example |
+| --- | --- |
+| Skill install path | `.agents/skills/diffwarden/SKILL.md` or `~/.agents/skills/diffwarden/SKILL.md` |
+| Explicit invocation | `$diffwarden review`, `$diffwarden fix local` (`status` needs an open PR) |
+| Skill picker | `/skills` → choose **diffwarden** |
+| Plain chat | Works when the task matches the skill description (implicit load) |
+
+After install, restart Codex or run `/clear` so it rescans skills.
+
+### Not supported (and why)
+
+| What you might expect | Why it does not work |
+| --- | --- |
+| `/diffwarden`, `/dw` in the `/` menu | Codex `/` commands are **built-in only** (`/skills`, `/review`, `/model`, …). Custom slash commands from skill or command files are not loaded. OpenAI directs skill use through `$skill-name` instead ([codex#11817](https://github.com/openai/codex/issues/11817)). |
+| `/prompts:diffwarden`, `/prompts:dw` | **Custom prompts** in `~/.codex/prompts/` were [deprecated](https://developers.openai.com/codex/custom-prompts) and **removed in the March 2026 Codex release** (0.117 series). OpenAI consolidated on Agent Skills as the standard; overlapping prompt-slash machinery was dropped ([codex#15941](https://github.com/openai/codex/issues/15941)). |
+| `.codex/commands/` or `.codex/skills/` | Legacy paths. Current Codex reads skills from `.agents/skills` / `~/.agents/skills` per [customization docs](https://developers.openai.com/codex/concepts/customization). |
+
+There is no `/dw` shorthand on Codex unless you add a separate skill named `dw`.
+Use `$diffwarden` — same subcommands and flags as the [command reference](#command-reference).
+
+```text
+$diffwarden review
+$diffwarden review #123 --comment
+$diffwarden fix local
+$diffwarden status         # PR only — needs gh + an open pull request
+/skills                    # pick diffwarden from the menu
 ```
 
 ## Your first run (step by step)
@@ -560,7 +602,7 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 
 ## Troubleshooting / FAQ
 
-**" `/dw` doesn't show in the `/` menu."** The command files weren't installed. Run `./install.sh` (it copies them by default), or copy by hand (see [Install](#install)): `.claude/commands/dw.md` (or `~/.claude/commands/dw.md`) for Claude Code, `.cursor/commands/dw.md` for Cursor. Claude Code needs a session restart after copying. `/diffwarden` works without the command file in Claude Code once the skill is installed.
+**" `/dw` doesn't show in the `/` menu."** For Claude Code/Cursor, the command files weren't installed; copy `dw.md` / `diffwarden.md` into `.claude/commands/`, `~/.claude/commands/`, `.cursor/commands/`, or `~/.cursor/commands/`, then restart. For **Codex CLI**, `/dw` and `/diffwarden` are **not supported** — the `/` menu is built-in commands only. Install the skill to `.agents/skills/diffwarden/` (or `~/.agents/skills/diffwarden/`), restart or `/clear`, then use `$diffwarden review ...` or `/skills`. See [Codex CLI](#codex-cli) for why `/prompts:dw` also no longer works on Codex ≥ 0.117.
 
 **"Caveman mode doesn't activate in Cursor."** Cursor has no hook system, so caveman
 needs a static rule file at `.cursor/rules/caveman.mdc` (see [Install](#install)).
@@ -626,7 +668,7 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 ## Files
 
 - `skills/diffwarden/SKILL.md` — the skill/playbook (the actual product).
-- `skills/diffwarden/commands/` — optional `/dw` `/diffwarden` slash files; copy to `.claude/commands/` (Claude Code) or `.cursor/commands/` (Cursor).
+- `skills/diffwarden/commands/` — optional `/dw` `/diffwarden` slash files for Claude Code and Cursor.
 - `install.sh` — installer that detects agents and copies the skill + command files into place.
 - `.github/workflows/ci.yml` — CI: shellchecks `install.sh` and enforces version sync.
 - `README.md` — this guide.
@@ -637,4 +679,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.21.0`
+Current version: `v0.23.2`

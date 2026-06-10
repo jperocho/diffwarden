@@ -4,6 +4,58 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.23.2] - 2026-06-10
+
+### Changed
+
+- Dropped unshipped `skills/diffwarden/prompts/` templates (never in a tagged
+  release). Codex 0.117.0 removed custom prompts upstream (`/prompts:dw`,
+  `/prompts:diffwarden`); the installer no longer references prompt files.
+
+## [0.23.1] - 2026-06-10
+
+### Fixed
+
+- Codex CLI docs and installer now match current Codex behavior (≥ 0.117.0):
+  invoke Diffwarden with `$diffwarden` or `/skills`, not `/dw`, `/diffwarden`, or
+  `/prompts:*`. Custom prompts in `~/.codex/prompts/` were removed upstream;
+  `install.sh` no longer copies prompt files there.
+- README adds a **Codex CLI** section listing supported vs unsupported invocation
+  paths and why (built-in-only `/` menu, deprecated/removed custom prompts,
+  `.agents/skills` as the skill path).
+- `SKILL.md` Slash Commands section now documents per-agent invocation and parses
+  `$diffwarden` the same as `/diffwarden` / `/dw`.
+
+## [0.23.0] - 2026-06-10
+
+### Fixed
+
+- Corrected Codex install support to match current Codex docs: Codex skills now
+  install to `.agents/skills/diffwarden/` or `~/.agents/skills/diffwarden/`,
+  not `.codex/skills/diffwarden/`.
+- Removed the unsupported `.codex/commands/` path. Codex CLI prompt aliases now
+  install to `~/.codex/prompts/` and are invoked as `/prompts:dw` or
+  `/prompts:diffwarden`.
+- README and `SKILL.md` now distinguish Claude Code/Cursor slash-command files
+  from Codex CLI skills and prompt aliases.
+
+## [0.22.0] - 2026-06-10
+
+### Added
+
+- **Codex installer support.** `install.sh` now detects `.codex` / `~/.codex`,
+  accepts `--codex`, and copies the skill plus `/dw` / `/diffwarden` command
+  files to `.codex/skills/diffwarden/` and `.codex/commands/`.
+- README and `SKILL.md` now document Codex as a first-class install target,
+  including manual-copy paths and `/dw` troubleshooting.
+
+### Changed
+
+- Installer safety guard now allows writes only under `.claude/`, `.codex/`,
+  and `.cursor/`, preserving the no-`sudo`, no-outside-config-dir stance.
+- README local-mode wording now matches the skill: `prepare local` is valid;
+  only `status` and posting/push flags are rejected with a local target.
+
 ## [0.21.0] - 2026-06-08
 
 ### Added
