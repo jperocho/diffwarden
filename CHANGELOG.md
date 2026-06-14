@@ -4,6 +4,56 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.24.0] - 2026-06-13
+
+### Added
+
+- Added `loop` as the primary review-fix-verify command.
+- Added `workspace` target for non-git and no-branch workspace review.
+- Added auto-fallback to workspace mode when no git repo, no branch, or no PR exists.
+- Added document review mode for plans, docs, guides, tutorials, specs, and markdown files.
+- Added lean default loop output using `cN/5` progress lines.
+- Added `--mvp` to stop at `c4/5` when only P3/info items remain.
+- Added `--verbose` for the full detailed report.
+- Added `--orchestrate` for optional reviewer/fixer role split.
+- Added orchestration model defaults via global config and project override.
+- Added safe config precedence for optional orchestration.
+- Added short PR comment format: Findings, Status, Confidence level.
+- Added explicit PR comment posting safety: approval, head-SHA recheck, dedupe, and COMMENT-only reviews.
+- Added workspace edit backups before non-git workspace fixes.
+- Added document backups before document fixes.
+- Added Pi Agent README install guide.
+- Added optional Pi Agent installer target (`--pi`, `--pi-root`).
+- Added Pi prompt-template aliases for `/dw` and `/diffwarden`.
+- Added `docs/orchestration.md` and linked it from README.
+- Added agentic implementation safety guidance for multi-agent worktrees, file ownership, merge gates, and conflict policy.
+
+### Changed
+
+- Recommended global install by default because Diffwarden is a machine-wide reviewer/fixer.
+- Simplified visible command surface to `review`, `loop`, `status`, `comment`, and `help`.
+- Kept `fix`, `prepare`, and `security` as compatibility aliases.
+- Changed default loop behavior to local edits only unless `--commit` or `--push` is passed.
+- Reduced default review and loop output to minimize tokens.
+- Moved detailed reports behind `--verbose`.
+
+### Fixed
+
+- Non-git folders no longer block review.
+- Git workspaces with no branch or detached HEAD no longer block workspace review.
+- Git workspaces with no current PR now fall back to local/workspace review unless PR behavior was explicit.
+- Missing `gh` no longer blocks non-PR review.
+- Document review no longer requires git.
+
+### Kept
+
+- No auto-merge.
+- No force-push.
+- No destructive git cleanup.
+- No weakening CI/tests/lint/auth/secrets.
+- No resolving human comments without explicit approval.
+- Normal `/dw loop` remains single-agent unless `--orchestrate` is passed.
+
 ## [0.23.2] - 2026-06-10
 
 ### Changed

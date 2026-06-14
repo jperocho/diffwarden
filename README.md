@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.23.2-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.24.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -10,13 +10,16 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 ## Contents
 
 - [Command reference](#command-reference)
+- [Workspace review (no git required)](#workspace-review-no-git-required)
 - [Review uncommitted changes (no PR)](#review-uncommitted-changes-no-pr)
 - [Auto-detected mode (code vs plan)](#auto-detected-mode-code-vs-plan)
 - [Web-augmented review (opt-in)](#web-augmented-review-opt-in)
-- [Loop until merge-ready (5/5)](#loop-until-merge-ready-55)
+- [Loop until merge-ready (c5/5)](#loop-until-merge-ready-c55)
+- [Optional orchestration](#optional-orchestration)
 - [What it actually does](#what-it-actually-does)
 - [Is this for me?](#is-this-for-me)
 - [Prerequisites (do this first)](#prerequisites-do-this-first)
+- [Pi Agent](#pi-agent)
 - [Install](#install)
 - [Slash commands](#slash-commands)
 - [Codex CLI](#codex-cli)
@@ -32,45 +35,75 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). There is **one** `review` and **one** `fix`; both auto-detect the target. Target arg: a PR (`#123`, `123`, full URL, `current`, or omit for the current branch PR), a local target — `local`, `staged`, or `worktree` — to review **uncommitted changes with no PR** (see [Review uncommitted changes](#review-uncommitted-changes-no-pr)), or a single prose `.md` plan file to **critique/revise a plan before coding** (see [Auto-detected mode](#auto-detected-mode-code-vs-plan)). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). v0.24.0 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs command files in Claude Code/Cursor. **Codex CLI is different** — see [Codex CLI](#codex-cli): use `$diffwarden` or `/skills`, not `/dw` or `/diffwarden`.
 
 | Command | What it does |
 |---------|--------------|
-| `/diffwarden review [<target>]` | Read-only review + fix plan. No edits, commits, or push. Auto-detects code vs plan target; prints `detected: code review` / `detected: plan review`. |
-| `/diffwarden review [<pr>] --comment` | Same, plus post `COMMENT`-only GitHub review (your OK each run). |
-| `/diffwarden fix [<target>]` | Fix safe issues locally + verify. No push. Auto-detects code vs plan target; prints `detected: code fix` / `detected: plan fix`. |
-| `/diffwarden fix [<pr>] --push` | Fix locally, commit + push when verified. |
-| `/diffwarden fix [<pr>] --reply` | Fix locally + reply on reviewer threads (your OK). |
-| `/diffwarden fix [<pr>] --reply --resolve` | Fix + thread replies + resolve fixed threads (your OK). |
-| `/diffwarden prepare [<pr>]` | Full prep: fix, verify, commit, push. |
-| `/diffwarden prepare [<pr>] --reply --resolve` | Full prep + replies + resolve fixed threads. |
-| `/diffwarden prepare [<pr>] --comment` | Full prep + post `COMMENT`-only review. |
-| `/diffwarden security [<pr>]` | Read-only security-focused pass. |
-| `/diffwarden security [<pr>] --comment` | Security pass + post findings on PR. |
-| `/diffwarden status [<pr>]` | Quick merge-readiness snapshot (checks, score, blockers). |
-| `/diffwarden review <plan.md>` | Critique a plan/design file before coding (read-only, no PR). Plan mode auto-detected from the `.md` target. |
-| `/diffwarden fix <plan.md>` | Revise a plan file in place to address findings (loops to 5/5; backs up to `<plan>.orig`). Plan mode auto-detected. |
-| `/diffwarden review <plan.md> --as-code` | Force code (diff) review of a `.md` file instead of plan critique. |
-| `/diffwarden review local` | Review uncommitted changes (vs `HEAD` + untracked), no PR. |
-| `/diffwarden review staged` | Review staged changes only, no PR. |
-| `/diffwarden fix local` | Fix safe issues in the working tree (no commit, no push). |
-| `/diffwarden security local` | Security-focused pass on uncommitted changes. |
-| `/diffwarden help` | List commands. Bare `/diffwarden` = help. |
+| `/diffwarden review [<target>]` | Read-only review + fix plan. No edits, commits, or push. Lean output by default. |
+| `/diffwarden loop [<target>]` | Review → fix safe issues → verify → rescore until `c5/5`. Local edits only unless `--commit` or `--push`. |
+| `/diffwarden status [<target>]` | Score/snapshot only (checks, confidence, blockers). |
+| `/diffwarden comment [<pr>]` | Short PR review comment. Asks for explicit approval before posting. PR-only. |
+| `/diffwarden help` | List commands. Bare `/diffwarden` = help. Use `/dw help --verbose` for advanced flags. |
+
+**Targets:**
+
+| Target | Scope |
+|--------|-------|
+| `workspace` | Current folder — git not required (see [Workspace review](#workspace-review-no-git-required)) |
+| `local` / `staged` | Git working tree or staged changes, no PR |
+| `#123`, PR URL, or omitted | GitHub PR (current branch when omitted) |
+| `path/to/file.md` | Plan, docs, guides, tutorials (see [Auto-detected mode](#auto-detected-mode-code-vs-plan)) |
 
 | Flag | Effect |
 |------|--------|
-| `--as-code` | On `review`/`fix`: force code mode (override the target detector). |
-| `--as-plan` | On `review`/`fix`: force plan mode. Invalid on a PR / `local` / `staged` / `worktree` target. |
-| `--comment` | Post new `COMMENT` review (never approve or request changes). |
-| `--reply` | Reply on existing reviewer threads (`fixed`, `defer`, `wontfix`, …). |
-| `--resolve` | Resolve threads after `fixed` / `already-addressed` replies (needs `--reply` + OK). |
-| `--security` | Prioritize auth, injection, SSRF, secrets, path traversal, crypto, data loss. |
-| `--web` | Opt into [web-augmented review](#web-augmented-review-opt-in) (alias `--research`). Off by default; asks `[y/N]` before each web search and only sends a redacted finding descriptor. |
-| `--push` | On `fix` only: allow commit + push after verify. |
-| `--max N` | Loop iterations (default `3`, max `5`). |
-| `--dry-run` | On `fix` only: plan without editing (= `review`). |
+| `--mvp` | Stop loop at `c4/5` when only P3/info remains. |
+| `--verbose` | Full detailed report (iterations, verification, changed files, risks, …). Off by default. |
+| `--orchestrate` | Split review and fix across configured models (see [Optional orchestration](#optional-orchestration)). Off by default. |
+| `--commit` | Commit verified changes (git modes only, after verification). |
+| `--push` | Commit + push verified changes (PR mode only, after PR head recheck). |
+| `--security` | Security-focused review (auth, injection, SSRF, secrets, path traversal, crypto, data loss). |
+| `--as-code` / `--as-plan` | Force code or plan/document mode for `review`/`loop`. |
+| `--web` / `--research` | Opt into [web-augmented review](#web-augmented-review-opt-in). Per-finding consent. |
+| `--reply` / `--resolve` | Reply on or resolve PR review threads (explicit approval required). |
+| `--dry-run` | Review only; no edits (= `review`). |
+| `--max N` | Loop iterations (default `3`, hard max `5`). |
+
+**Compatibility aliases** (still work; not shown in short help):
+
+| Alias | Equivalent |
+|-------|------------|
+| `fix` | `loop` |
+| `prepare` | `loop --push` |
+| `security` | `review --security` |
+| `review-plan <file>` | `review <file> --as-plan` |
+| `fix-plan <file>` | `loop <file> --as-plan` |
+
+```text
+/dw review workspace
+/dw loop workspace
+/dw loop #123 --commit
+/dw loop #123 --push
+/dw comment #123
+/dw status
+/dw help
+/dw help --verbose
+```
+
+## Workspace review (no git required)
+
+Use `workspace` to review the current folder when there is no git repo, no branch, detached HEAD, or no open PR. Diffwarden discovers files, detects the stack, and reviews high-signal code/config/tests/docs — no PR detection, no CI, no GitHub comments.
+
+```text
+/dw review workspace          # read-only workspace review
+/dw loop workspace            # review + fix safe issues (backs up before editing)
+/dw status workspace          # score only
+```
+
+Auto-fallback: when no explicit PR target is given and git/branch/PR is missing, Diffwarden falls back to workspace mode instead of blocking.
+
+`loop workspace` creates a reversible baseline in `.diffwarden/backups/<timestamp>/` before the first edit. Workspace mode does not commit, push, or post PR comments. `--push` and `--commit` are rejected for `workspace`.
 
 ## Review uncommitted changes (no PR)
 
@@ -86,53 +119,51 @@ your project context, and the same review pipeline.
 ```text
 /dw review local          # read-only review of everything uncommitted
 /dw review staged         # review only what you've git add-ed
-/dw fix local             # review + apply safe fixes to the working tree (no commit/push)
-/dw security local        # security-focused pass on uncommitted changes
+/dw loop local            # review + apply safe fixes (no commit/push unless --commit)
+/dw review local --security   # security-focused pass on uncommitted changes
 ```
 
-Valid with `review`, `fix`, `prepare`, and `security`. Everything that defines a
+Valid with `review`, `loop`, and `status`. Everything that defines a
 review still runs — classification, severity, confidence score, fix loop,
 verification, security checklist. What's skipped (no PR exists): PR detection,
-CI, review/issue comments, posting (`--comment`/`--reply`/`--resolve`), and any
-commit or push (`fix local` and `prepare local` edit the working tree only). The
-confidence score reports `checks: n/a (local)` and reflects readiness-to-commit.
-`status` and posting/push flags are rejected with a local target.
+CI, review/issue comments, `comment`, and push. `loop local` edits the working tree only unless you pass `--commit`. `comment` and `--push` are rejected with a local target.
 
 ## Auto-detected mode (code vs plan)
 
-`review` and `fix` are single commands that work on **either** code or a plan
-document. Diffwarden classifies the *target* and runs the matching mode — you do
-not pick a separate subcommand. Every run prints the mode it chose:
-`detected: code review | plan review | code fix | plan fix`.
+`review` and `loop` work on **either** code or a plan/docs file.
+Diffwarden classifies the *target* and runs the matching mode — you do
+not pick a separate subcommand.
 
 | Target | Detected mode |
 |--------|---------------|
+| `workspace` | code (folder scan, git optional) |
 | `#123`, `123`, full PR URL, `current`, or omitted | code |
 | `local`, `staged`, `worktree` | code |
-| a single prose `.md` plan file (headings/sections, no diff) | plan |
+| a single prose `.md` plan/docs file | document/plan |
 | `--as-code` flag | code (forced) |
 | `--as-plan` flag | plan (forced) |
 | **mixed** signals (e.g. a PR *and* a `.md` plan) | **asks you; default code** |
 
 ```text
-/dw review #123            # detected: code review
-/dw review                 # detected: code review (current branch / worktree)
-/dw review docs/plan.md    # detected: plan review (critique a plan, no PR)
-/dw review docs/plan.md --as-code   # detected: code review (review the file as a diff)
-/dw fix #123               # detected: code fix
-/dw fix docs/plan.md       # detected: plan fix (revise the plan in place, no PR)
-/dw fix docs/plan.md --as-plan      # detected: plan fix (explicit)
+/dw review #123            # PR review
+/dw review                 # current branch PR or git-local/workspace fallback
+/dw review workspace       # folder review, no git required
+/dw review docs/plan.md    # document/plan review
+/dw review docs/plan.md --as-code   # force code review of the file
+/dw loop #123              # PR fix loop
+/dw loop docs/plan.md      # revise document in place (backs up to <file>.orig)
+/dw loop docs/plan.md --as-plan     # explicit document mode
 ```
 
 `--as-code` / `--as-plan` override the detector; on a mix of signals Diffwarden
 **asks first** (defaulting to code only if you don't choose) — it never silently
-guesses. Plan mode never touches a PR, git, or code: plan `review` is a read-only
-critique; plan `fix` revises only the plan file (backing up to `<plan>.orig`) and
-never commits or pushes. `prepare`, `security`, and `status` are code-only.
+guesses. Document mode never touches a PR or git: `review` is read-only;
+`loop` revises only the target document (backing up to `<file>.orig`) and
+never commits or pushes unless you pass `--commit` in a git context. `comment` is PR-only.
 
 > The older `review-plan` / `fix-plan` names still work as **hidden back-compat
-> aliases** (equivalent to `review` / `fix <file> --as-plan`), but `review` /
-> `fix` on a `.md` file is the way to invoke plan mode now.
+> aliases** (equivalent to `review` / `loop <file> --as-plan`), but `review` /
+> `loop` on a `.md` file is the way to invoke document mode now.
 
 ## Web-augmented review (opt-in)
 
@@ -173,65 +204,89 @@ it; URL cited) or `local-only` (the default). Web grounding **never** raises
 severity on its own and never bypasses a safety cap — severity and the
 confidence score stay Diffwarden's own judgment.
 
-Valid on `review`, `fix`, `prepare`, and `security` (code targets, including
-`local` / `staged` / `worktree`), and compatible with `--dry-run` and
-`--security`. Rejected on `status` (snapshot only) and on plan mode (`--as-plan`
-or a `.md` plan target) — plan critique grounds against your repo, not the web.
+Valid on `review`, `loop`, and `review --security` (code targets, including
+`local` / `staged` / `workspace`), and compatible with `--dry-run`.
+Rejected on `status` (snapshot only) and on document mode (`--as-plan`
+or a `.md` docs target) — document critique grounds against your repo, not the web.
 
 ```text
 /dw review #123 --web      # asks [y/N] before grounding any uncertain finding
-/dw fix --web --security   # security run reads raw; web grounding still per-finding gated
+/dw loop --web --security  # security run reads raw; web grounding still per-finding gated
 ```
 
-## Loop until merge-ready (5/5)
+## Loop until merge-ready (c5/5)
 
-Diffwarden loops automatically inside `fix` and `prepare` — no separate loop command.
-Each round: preflight → collect evidence → score confidence → fix safe issues →
-verify → optional commit/push → re-check. Stops at **5/5** or a safety stop.
+`loop` is the primary review-fix-verify command. Each iteration: collect evidence → classify top blocker → compute confidence → fix safe scoped issue → verify → rescore. Stops at **c5/5**, `--mvp` at **c4/5**, or a safety stop.
+
+### Lean output (default)
+
+Loop prints one line per iteration — no long evidence blocks unless `--verbose`:
+
+```text
+c2/5 P1 src/auth.ts:44 — missing ownership check
+c3/5 P2 tests missing for changed branch
+c4/5 mvp-ready — only P3/info remains
+c5/5 clean
+```
+
+Review output is also lean by default:
+
+```text
+Findings:
+- P1 src/auth.ts:44 — missing ownership check
+- P2 tests/auth.test.ts — missing coverage for denied update
+
+Status: not-ready
+Confidence level: 2/5
+```
+
+Use `--verbose` for the full report (iterations, verification, changed files, risks, next action, how to test).
 
 ### Commands
 
 | Goal | Command |
 |------|---------|
-| Loop locally (no push) | `/dw fix --max 5` |
-| Loop + commit + push | `/dw prepare --max 5` |
+| Loop locally (no commit/push) | `/dw loop` or `/dw loop --max 5` |
+| Loop + commit | `/dw loop --commit` |
+| Loop + commit + push (PR only) | `/dw loop --push` or `/dw loop #123 --push` |
 | Check score only | `/dw status` |
-| Loop + reply on review threads | `/dw prepare --max 5 --reply --resolve` |
+| Stop at MVP (c4/5) | `/dw loop --mvp` |
+| Post short PR comment | `/dw comment #123` |
 
 Natural language: `Use diffwarden on the current PR --max-iterations 5`
 
 Default **3** iterations; hard max **5** unless you explicitly ask for more in chat.
 
-### What 5/5 means
+### What c5/5 means
 
-All must be true:
+All must be true (scope-dependent — PR vs local vs workspace):
 
-- Required CI checks pass
+- Required CI checks pass (PR mode) or grounded local verification passes
 - No actionable findings remain
 - No open P0/P1/security issue
-- PR description has adequate summary, testing, and risk notes
-- Review comments addressed or classified already-addressed with evidence
+- PR description adequate (PR mode) or document/workspace ready
 
-Score is recomputed from evidence every iteration. **5/5 does not auto-merge** — you merge.
+Score is recomputed from evidence every iteration. **c5/5 does not auto-merge** — you merge.
 
 ### Confidence scale (short)
 
 | Score | Meaning |
 |-------|---------|
-| `5/5` | Merge-ready (loop stops) |
-| `4/5` | Only P3 / informational items left |
-| `3/5` | P2 issues or missing targeted test |
-| `2/5` | P1 issue or failing required check |
-| `0-1/5` | P0, security, or hard build failure |
+| `c5/5` | Clean / merge-ready (loop stops) |
+| `c4/5` | MVP-ready — only P3 / informational items left (`--mvp` stops here) |
+| `c3/5` | P2 issues or missing targeted test / verification |
+| `c2/5` | P1 issue or failing required check |
+| `c1/5` | P0, security, or hard build failure |
 
 Safety caps: unresolved P0/security → max `1/5`; failing required check → max `2/5`;
 needs-user-decision → max `3/5` until you decide.
 
-### When it stops before 5/5
+### When it stops before c5/5
 
 | Reason | What to do |
 |--------|------------|
-| Hit `--max 5` | Run again: `/dw prepare --max 5` |
+| Hit `--max 5` | Run again: `/dw loop --max 5` |
+| `--mvp` and c4/5 | Done for MVP — merge or continue without `--mvp` |
 | Needs user decision (API, product, migration…) | Answer in chat, re-run |
 | Same finding repeats | Agent stops — fix root cause manually |
 | CI still pending | Wait for green, then `/dw status` |
@@ -241,9 +296,16 @@ needs-user-decision → max `3/5` until you decide.
 
 ```text
 /dw status
-/dw prepare --max 5
-/dw prepare --max 5 --reply --resolve
+/dw loop --max 5
+/dw loop #123 --push
+/dw comment #123
 ```
+
+## Optional orchestration
+
+Diffwarden can optionally split review and fix work across different models using
+`--orchestrate`. This is off by default. See
+[docs/orchestration.md](docs/orchestration.md).
 
 ## What it actually does
 
@@ -272,35 +334,18 @@ Don't use it for: deploying to production, auto-merging, rewriting git history, 
 
 ## Prerequisites (do this first)
 
-You need four things. Check each before installing.
+You need a coding agent that can read skills and run shell commands. Examples: Claude Code, Codex, GitHub Copilot CLI, Cursor, OpenCode, Pi Agent. The installer targets Claude Code, Codex, Cursor, and Pi directly; any other skill-loading agent works via manual copy ([Install](#install) Option C/D).
 
-**1. A coding agent that can read skills and run shell commands.** Examples: Claude Code, Codex, GitHub Copilot CLI, Cursor, OpenCode. The installer targets Claude Code, Codex, and Cursor directly; any other skill-loading agent works via manual copy ([Install](#install) Option C/D).
-
-**2. `git`.**
+**For PR review** you also need `git`, GitHub CLI (`gh`), and a logged-in GitHub session:
 
 ```bash
-git --version   # any recent version is fine
-```
-
-**3. GitHub CLI (`gh`).**
-
-```bash
-gh --version    # if "command not found", install it:
-
-# macOS
-brew install gh
-# Debian / Ubuntu
-sudo apt install gh
-# Windows
-winget install --id GitHub.cli
-```
-
-**4. A logged-in GitHub session.**
-
-```bash
+git --version
+gh --version
 gh auth status        # should say "Logged in to github.com"
 gh auth login         # run this if it doesn't
 ```
+
+**For workspace or document review** git and `gh` are optional. Diffwarden falls back to workspace mode when git/branch/PR is unavailable.
 
 Optional: export `GH_TOKEN` (or `GITHUB_TOKEN`) for CI/automation when `gh auth
 login` is not available. Diffwarden tries `gh auth status` first; if you are
@@ -308,9 +353,77 @@ logged in, it ignores env tokens for that session so `gh` uses your user. With
 no active user, it validates env tokens with `gh api user`. It never searches
 files or config for tokens.
 
-You also need to be inside a git repository that has an open GitHub pull request.
+## Pi Agent
+
+Diffwarden can be used with Pi Agent by installing the skill manually or through the installer.
+
+Pi support is install-only. Diffwarden core behavior stays agent-neutral.
+
+### Manual install
+
+Copy the Diffwarden skill into one of Pi Agent's skill locations:
+
+```bash
+# project scope, loaded after the project is trusted
+mkdir -p .pi/skills/diffwarden
+cp skills/diffwarden/SKILL.md .pi/skills/diffwarden/SKILL.md
+
+# global scope
+mkdir -p ~/.pi/agent/skills/diffwarden
+cp skills/diffwarden/SKILL.md ~/.pi/agent/skills/diffwarden/SKILL.md
+```
+
+Pi also discovers skills from `.agents/skills/` and `~/.agents/skills/`, so the Codex-compatible install path works in Pi too.
+
+Optional `/dw` and `/diffwarden` aliases should be installed as Pi prompt templates, not as runtime commands or extensions:
+
+```bash
+# project scope
+mkdir -p .pi/prompts
+cp skills/diffwarden/prompts/dw.md .pi/prompts/dw.md
+cp skills/diffwarden/prompts/diffwarden.md .pi/prompts/diffwarden.md
+
+# global scope
+mkdir -p ~/.pi/agent/prompts
+cp skills/diffwarden/prompts/dw.md ~/.pi/agent/prompts/dw.md
+cp skills/diffwarden/prompts/diffwarden.md ~/.pi/agent/prompts/diffwarden.md
+```
+
+The prompt templates must pass arguments through with `$ARGUMENTS` so `/dw loop workspace` expands to a Diffwarden invocation with `loop workspace` intact.
+
+Restart Pi Agent or run `/reload` after installing. Without prompt templates, invoke the skill with `/skill:diffwarden` or plain chat.
+
+### Installer
+
+```bash
+./install.sh --pi --project
+./install.sh --pi --global
+./install.sh --pi --pi-root ~/.pi/agent --global
+./install.sh --pi --pi-root ./.pi --project
+./install.sh --pi --dry-run
+```
+
+### Usage
+
+```text
+/dw review workspace
+/dw loop workspace
+/dw review
+/dw loop
+/diffwarden review
+/diffwarden loop
+/skill:diffwarden loop workspace
+```
+
+### Extension note
+
+A Pi extension is not required for v0.24.0. Use the skill and prompt templates first.
+
+Consider a Pi extension later only if Diffwarden needs native Pi command behavior beyond prompt expansion, custom compact progress UI, persistent review state, shell/tool interception, custom file scanning, or custom confirmation dialogs.
 
 ## Install
+
+**Global install is recommended** — Diffwarden is a reusable reviewer/fixer that should be available in every workspace. Project install is still supported for team/repo-specific distribution.
 
 There is **no `npx`/skills.sh step** — that loader proved flaky, so Diffwarden
 installs with its own script or a plain copy. Both place the same files:
@@ -325,18 +438,20 @@ installs with its own script or a plain copy. Both place the same files:
 where `<root>` is your project folder (project scope) or `$HOME` (global scope).
 
 **Option A — installer (recommended).** It detects which agents you have, asks
-where to install, copies the skill + command files into the right places,
+where to install (global recommended), copies the skill + command files into the right places,
 skips files already up to date, and never overwrites a changed file without
 asking.
 
 > **Security — inspect before you run.** Diffwarden is a safety tool; don't
 > pipe a script straight into a shell on its word. Download it, read it, then
 > run it. The installer pins to a release tag, uses HTTPS only, never uses
-> `sudo`, and only writes under `.claude/`, `.cursor/`, and `.agents/`.
+> `sudo`, and only writes under `.claude/`, `.cursor/`, `.agents/`, Pi roots
+> (`skills/` + `prompts/` only), and optional `~/.config/diffwarden/` when you
+> confirm orchestration defaults.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.23.2/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.24.0/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -352,6 +467,7 @@ Useful flags (see `./install.sh --help`):
 ./install.sh --claude --project   # Claude Code, current repo only
 ./install.sh --codex --global     # Codex, all projects on this machine
 ./install.sh --cursor --global    # Cursor, all projects on this machine
+./install.sh --pi --global        # Pi Agent, all projects on this machine
 ./install.sh --yes                # non-interactive (accept detected defaults)
 ./install.sh --force              # overwrite differing files without prompting
 ```
@@ -430,12 +546,11 @@ Examples and natural-language form. Full command table: [Command reference](#com
 
 ```text
 /diffwarden review #123
-/diffwarden review #123 --comment
-/diffwarden fix
-/diffwarden fix #123 --security
-/diffwarden fix #123 --reply --resolve
-/diffwarden prepare #123 --comment
+/diffwarden loop
+/diffwarden loop #123 --push
+/diffwarden comment #123
 /dw status
+/dw loop workspace
 /dw help
 ```
 
@@ -456,7 +571,7 @@ The grammar is the same; only the prefix changes.
 | How | Example |
 | --- | --- |
 | Skill install path | `.agents/skills/diffwarden/SKILL.md` or `~/.agents/skills/diffwarden/SKILL.md` |
-| Explicit invocation | `$diffwarden review`, `$diffwarden fix local` (`status` needs an open PR) |
+| Explicit invocation | `$diffwarden review`, `$diffwarden loop workspace` |
 | Skill picker | `/skills` → choose **diffwarden** |
 | Plain chat | Works when the task matches the skill description (implicit load) |
 
@@ -475,9 +590,10 @@ Use `$diffwarden` — same subcommands and flags as the [command reference](#com
 
 ```text
 $diffwarden review
-$diffwarden review #123 --comment
-$diffwarden fix local
-$diffwarden status         # PR only — needs gh + an open pull request
+$diffwarden loop workspace
+$diffwarden loop #123 --push
+$diffwarden comment #123
+$diffwarden status
 /skills                    # pick diffwarden from the menu
 ```
 
@@ -506,35 +622,37 @@ $diffwarden status         # PR only — needs gh + an open pull request
    Both mean **review and plan only — change nothing.** Best way to start: zero risk.
 
 4. Read the report. It lists findings, severity, and a fix plan.
-5. When ready to let it act, drop `--dry-run`:
+5. When ready to let it act:
 
    ```text
-   /diffwarden fix
+   /diffwarden loop
    ```
 
-   Or:
+   Or with explicit push on a PR:
 
    ```text
-   Use diffwarden on PR https://github.com/owner/repo/pull/123
+   /diffwarden loop #123 --push
    ```
 
 If you omit the PR number/URL, it detects the PR from your current branch.
 
 ## Modes / flags
 
-Add these after the command. Combine freely.
+Add these after the command. Combine freely. Short help shows primary flags; use `/dw help --verbose` for the full list.
 
 | Flag | What it does |
 |------|--------------|
-| `--as-code` / `--as-plan` | Force `review`/`fix` into code or plan mode, overriding the [target detector](#auto-detected-mode-code-vs-plan). |
+| `--mvp` | Stop loop at `c4/5` when only P3/info remains. |
+| `--verbose` | Full detailed report instead of lean output. |
+| `--orchestrate` | Optional reviewer/fixer model split ([docs/orchestration.md](docs/orchestration.md)). |
+| `--commit` | Commit verified changes (git modes, after verification). |
+| `--push` | Commit + push verified changes (PR mode only, after head recheck). |
+| `--as-code` / `--as-plan` | Force code or document mode, overriding the [target detector](#auto-detected-mode-code-vs-plan). |
 | `--dry-run` | Review and plan only. No edits, commits, pushes, or comments. **Start here.** |
-| `--no-push` | Apply fixes locally but never push them. |
-| `--security-focus` | Prioritize security: auth, injection, SSRF, secrets, path traversal, crypto, data loss. |
-| `--post-review` | Post findings to the PR as a GitHub `COMMENT` review (plus optional inline comments). Off by default; needs your explicit OK each run. Never approves, requests changes, or merges. |
-| `--reply-comments` | Reply on existing inline review threads after fixes. Types: `fixed`, `already-addressed`, `defer`, `wontfix`, `needs-user`. Off by default; needs your OK each run. |
-| `--resolve-replied` | Resolve threads after `fixed` / `already-addressed` replies. Requires `--reply-comments` and explicit OK. |
-| `--web` / `--research` | Opt into [web-augmented review](#web-augmented-review-opt-in). Off by default; even when set, Diffwarden asks `[y/N]` and waits before each web search and only sends a redacted finding descriptor. Code targets only; rejected on `status` and plan mode. |
-| `--max-iterations N` | How many review→fix→verify rounds. Default `3`; hard max `5` unless you say otherwise. |
+| `--security` | Prioritize security: auth, injection, SSRF, secrets, path traversal, crypto, data loss. |
+| `--reply` / `--resolve` | Reply on or resolve PR review threads (explicit OK each run). |
+| `--web` / `--research` | Opt into [web-augmented review](#web-augmented-review-opt-in). Per-finding consent. |
+| `--max N` | Loop iterations. Default `3`; hard max `5`. |
 
 ## Common recipes
 
@@ -544,32 +662,43 @@ Add these after the command. Combine freely.
 /diffwarden review
 ```
 
-**Review a teammate's PR and post comments on GitHub:**
+**Review a teammate's PR and post a short comment:**
 
 ```text
-/diffwarden review #123 --comment
+/diffwarden comment #123
 ```
 
-Posts a `COMMENT`-type review with inline notes. It will **not** approve or request changes — that decision stays yours.
+Posts a `COMMENT`-type review with inline P-level notes after your approval. It will **not** approve or request changes — that decision stays yours.
 
 **Security-focused pass:**
 
 ```text
-/diffwarden security #123
+/diffwarden review #123 --security
+```
+
+**Review a folder with no git repo:**
+
+```text
+/dw review workspace
+/dw loop workspace
 ```
 
 **Address review feedback and reply on threads:**
 
 ```text
-/diffwarden fix #123 --reply --resolve
+/diffwarden loop #123 --reply --resolve
 ```
-
-Replies on each addressed inline comment (`fixed in abc123…`). Resolves threads only when type is `fixed` or `already-addressed` and you authorized `--resolve`.
 
 **Let it fix safe issues locally, but don't push:**
 
 ```text
-/diffwarden fix
+/diffwarden loop
+```
+
+**Loop until merge-ready and push (PR):**
+
+```text
+/diffwarden loop #123 --push
 ```
 
 ## What it will and won't do
@@ -578,10 +707,10 @@ Replies on each addressed inline comment (`fixed in abc123…`). Resolves thread
 
 - Read diffs, checks, and comments.
 - Fix safe, in-scope issues and run tests to verify.
-- Reply on reviewer comment threads (with `--reply-comments` + your OK).
-- Resolve fixed threads (with `--resolve-replied` + your OK).
-- Post comment-only reviews (with `--post-review` + your OK).
-- Commit/push **only** if you ask for full PR preparation.
+- Reply on reviewer comment threads (with `--reply` + your OK).
+- Resolve fixed threads (with `--resolve` + your OK).
+- Post short comment-only reviews (with `comment` + your OK).
+- Commit/push **only** when you pass `--commit` or `--push`.
 
 **Won't (the safety promise):**
 
@@ -622,7 +751,7 @@ user login wins.
 
 **"Will it merge my PR?"** No. Never. You merge.
 
-**"Can it review a PR from a fork?"** It can review and (with `--post-review`) comment. It usually can't push fixes to a fork branch, so use `--no-push` / treat fixes as suggestions.
+**"Can it review a PR from a fork?"** It can review and (with `comment`) post findings. It usually can't push fixes to a fork branch, so omit `--push` / treat fixes as suggestions.
 
 **"It stopped early."** It hit a safety stop (dirty worktree, ambiguous risk, head changed, max iterations). Read the report — it says why and what to do next.
 
@@ -669,6 +798,8 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 - `skills/diffwarden/SKILL.md` — the skill/playbook (the actual product).
 - `skills/diffwarden/commands/` — optional `/dw` `/diffwarden` slash files for Claude Code and Cursor.
+- `skills/diffwarden/prompts/` — Pi Agent prompt templates for `/dw` and `/diffwarden`.
+- `docs/orchestration.md` — optional model orchestration guide.
 - `install.sh` — installer that detects agents and copies the skill + command files into place.
 - `.github/workflows/ci.yml` — CI: shellchecks `install.sh` and enforces version sync.
 - `README.md` — this guide.
@@ -679,4 +810,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.23.2`
+Current version: `v0.24.0`

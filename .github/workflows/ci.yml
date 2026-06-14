@@ -37,6 +37,34 @@ jobs:
           fi
           echo "Version sync OK (v${v})"
 
+      - name: Pi installer dry-run
+        run: |
+          ./install.sh --pi --pi-root /tmp/pi-agent --project --dry-run
+          ./install.sh --pi --pi-root /tmp/pi-agent --global --dry-run
+
+      - name: Pi prompt templates
+        run: |
+          test -f skills/diffwarden/prompts/dw.md
+          grep -q '\$ARGUMENTS' skills/diffwarden/prompts/dw.md
+
+      - name: Orchestration docs
+        run: |
+          test -f docs/orchestration.md
+          grep -q "docs/orchestration.md" README.md
+
+      - name: Command file consistency
+        run: |
+          set -euo pipefail
+          for f in skills/diffwarden/commands/dw.md skills/diffwarden/commands/diffwarden.md; do
+            grep -q "loop" "$f"
+            grep -q "comment" "$f"
+            grep -q "workspace" "$f"
+            grep -q -- "--orchestrate" "$f"
+            grep -q -- "--web" "$f"
+            grep -q -- "--as-plan" "$f"
+          done
+          echo "Command file consistency OK"
+
       - name: No orphaned version strings
         run: |
           set -euo pipefail

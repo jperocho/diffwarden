@@ -5,11 +5,17 @@ Read and follow the **diffwarden** skill (`SKILL.md`).
 The user text after this command (if any) is a Diffwarden invocation. Parse per the skill **Slash Commands** section:
 
 - No args → `help`
-- Else parse subcommand (`review`, `fix`, `prepare`, `security`, `status`, `help`), an optional target — a PR (`#123`, URL, `current`), a local target (`local`, `staged`, `worktree`), or a `.md` plan filepath — and flags (`--as-code`, `--as-plan`, `--comment`, `--reply`, `--resolve`, `--security`, `--delegate`, `--web`, `--push`, `--max N`, `--dry-run`)
-- `review`/`fix` auto-detect the target (code vs plan) per the skill **Target Auto-Detection** section; `--as-code`/`--as-plan` override. Print the resulting `detected: code review | plan review | code fix | plan fix` banner before working. `review-plan`/`fix-plan <filepath>` are hidden back-compat aliases for `review`/`fix <filepath> --as-plan` — accept them, but don't advertise them.
-- `--web` (alias `--research`) enables **Web-Augmented Review** — off by default. Even when set, Diffwarden asks `[y/N]` and waits before *every* web search and sends only a redacted finding descriptor (never repo code, diff, or secrets); see the skill **Web-Augmented Review (opt-in)** section. Valid on `review`/`fix`/`prepare`/`security` (code targets); rejected on `status` and plan mode.
+- Else parse subcommand (`review`, `loop`, `status`, `comment`, `help`), an optional target, and flags
+- Primary subcommands: `review` (read-only), `loop` (review-fix-verify until c5/5), `status` (score only), `comment` (short PR review comment), `help`
+- Compatibility aliases (accept, don't advertise): `fix` → `loop`; `prepare` → `loop --push`; `security` → `review --security`; `review-plan <file>` → `review <file> --as-plan`; `fix-plan <file>` → `loop <file> --as-plan`
+- Targets: `workspace` (current folder, git not required), `local` (git working tree), `staged` (git staged), PR (`#123`, URL), or file path (plan/docs/guides/tutorials)
+- Flags: `--mvp`, `--verbose`, `--orchestrate`, `--commit`, `--push`, `--as-code`, `--as-plan`, `--web` (alias `--research`), `--reply`, `--resolve`, `--delegate`, `--dry-run`, `--max N`, `--review-model`, `--fix-code-model`, `--fix-text-model`, `--security`
+- `review`/`loop` auto-detect code vs document mode per skill **Target Auto-Detection**; `--as-code`/`--as-plan` override. `comment` is PR-only.
+- `--web` is opt-in per-finding consent; valid on `review`/`loop` (code targets); rejected on `status` and document mode.
+- `--orchestrate` enables optional reviewer/fixer role split; off by default. Model flags override config when set.
+- Default output is lean (`cN/5` loop lines); `--verbose` restores full report.
 
-Examples: `review`, `review #123 --comment`, `fix --reply --resolve`, `status`, `review local`, `fix staged --security`, `review docs/plan.md`, `review docs/plan.md --as-code`, `fix docs/plan.md`, `review #123 --web`.
+Examples: `loop workspace`, `review #123`, `comment #123`, `status local`, `loop docs/install.md --as-plan`, `review --security`, `loop --orchestrate`, `loop --mvp`, `review #123 --web`.
 
 If the `caveman` skill is loaded, run in caveman mode — see the skill **Caveman Mode** section.
 

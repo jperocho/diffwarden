@@ -4,19 +4,22 @@
 #
 # Places the Diffwarden skill and its optional /dw and /diffwarden command files
 # into the right directories for the coding agents you choose (Claude Code,
-# Cursor, and/or Codex), at project scope (current folder) and/or global scope
-# (home). Codex reads skills from .agents/skills (invoke with $diffwarden or
-# /skills); it does not support custom /dw or /diffwarden slash commands.
+# Cursor, Codex, and/or Pi Agent), at project scope (current folder) and/or
+# global scope (home). Codex reads skills from .agents/skills (invoke with
+# $diffwarden or /skills); it does not support custom /dw or /diffwarden slash
+# commands. Pi Agent uses skills under .pi/skills/ or ~/.pi/agent/skills/ and
+# optional prompt templates under .pi/prompts/ or ~/.pi/agent/prompts/.
 #
 # It only ever writes under .claude/ , ~/.claude/ , .cursor/ , ~/.cursor/ ,
-# .agents/ , and ~/.agents/ . It never uses sudo, never
+# .agents/ , ~/.agents/ , .pi/skills/ , .pi/prompts/ , ~/.pi/agent/skills/ ,
+# ~/.pi/agent/prompts/ , and ~/.config/diffwarden/ . It never uses sudo, never
 # touches anything else, never overwrites a changed file without asking, and
 # skips files that are already up to date.
 #
 # SECURITY: read this script before running it. The recommended way to install
 # is download-then-inspect-then-run, not pipe-to-shell. See the README.
 #
-#   curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.23.2/install.sh
+#   curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.24.0/install.sh
 #   less install.sh        # read it
 #   bash install.sh        # then run it
 #
@@ -29,15 +32,21 @@
 #   --claude            Install for Claude Code only.
 #   --cursor            Install for Cursor only.
 #   --codex             Install for Codex only.
+#   --pi                Install for Pi Agent only (skill + prompt templates).
 #                       (default: every agent whose config dir is detected)
+#   --pi-root <path>    Pi Agent root (default: .pi for project,
+#                       ~/.pi/agent for global). Writes only under
+#                       <pi-root>/skills/ and <pi-root>/prompts/.
 #   --project           Install at project scope only (current directory).
 #   --global            Install at global scope only ($HOME).
-#                       (default: project scope)
-#   -y, --yes           Non-interactive; accept detected agents and defaults.
+#                       (default: interactive — global recommended)
+#   -y, --yes           Non-interactive; global=yes, project=no, config=no
+#                       unless DW_INSTALL_GLOBAL, DW_INSTALL_PROJECT, or
+#                       DW_INSTALL_CONFIG override.
 #   -f, --force         Overwrite files that differ, without prompting.
 #   --dry-run           Print the plan and exit; write nothing.
 #   --ref <ref>         Git ref/tag to fetch from when run outside the repo
-#                       (default: v0.23.2). Ignored when run inside a clone.
+#                       (default: v0.24.0). Ignored when run inside a clone.
 #   -h, --help          Show this help and exit.
 
 set -euo pipefail
@@ -45,15 +54,26 @@ set -euo pipefail
 # --- constants ---------------------------------------------------------------
 
 SKILL_NAME="diffwarden"
-DEFAULT_REF="v0.23.2"
+DEFAULT_REF="v0.24.0"
 RAW_BASE="https://raw.githubusercontent.com/jperocho/diffwarden"
 COMMAND_FILES=("dw.md" "diffwarden.md")
+PI_PROMPT_FILES=("dw.md" "diffwarden.md")
+CONFIG_DIR="$HOME/.config/diffwarden"
+CONFIG_FILE="$CONFIG_DIR/config.yml"
+CONFIG_CONTENT='orchestration:
+  review_model: gpt5.5-xhigh
+  fix_code_model: deepseek
+  fix_text_model: gpt5.5-low
+'
 
 # --- options -----------------------------------------------------------------
 
 WANT_CLAUDE=""
 WANT_CURSOR=""
 WANT_CODEX=""
+WANT_PI=""
+PI_ROOT=""
+WANT_CONFIG=0
 SCOPE_PROJECT=""
 SCOPE_GLOBAL=""
 ASSUME_YES=0
@@ -61,29 +81,28 @@ FORCE=0
 DRY_RUN=0
 REF="${DW_REF:-$DEFAULT_REF}"
 
-usage() { sed -n '3,41p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,50p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --claude)  WANT_CLAUDE=1 ;;
-    --cursor)  WANT_CURSOR=1 ;;
-    --codex)   WANT_CODEX=1 ;;
-    --project) SCOPE_PROJECT=1 ;;
-    --global)  SCOPE_GLOBAL=1 ;;
-    -y|--yes)  ASSUME_YES=1 ;;
-    -f|--force) FORCE=1 ;;
-    --dry-run) DRY_RUN=1 ;;
-    --ref)     REF="${2:?--ref needs a value}"; shift ;;
-    --ref=*)   REF="${1#--ref=}" ;;
-    -h|--help) usage; exit 0 ;;
+    --claude)    WANT_CLAUDE=1 ;;
+    --cursor)    WANT_CURSOR=1 ;;
+    --codex)     WANT_CODEX=1 ;;
+    --pi)        WANT_PI=1 ;;
+    --pi-root)   PI_ROOT="${2:?--pi-root needs a value}"; shift ;;
+    --pi-root=*) PI_ROOT="${1#--pi-root=}" ;;
+    --project)   SCOPE_PROJECT=1 ;;
+    --global)    SCOPE_GLOBAL=1 ;;
+    -y|--yes)    ASSUME_YES=1 ;;
+    -f|--force)  FORCE=1 ;;
+    --dry-run)   DRY_RUN=1 ;;
+    --ref)       REF="${2:?--ref needs a value}"; shift ;;
+    --ref=*)     REF="${1#--ref=}" ;;
+    -h|--help)   usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; echo "Run with --help." >&2; exit 2 ;;
   esac
   shift
 done
-
-# Default agent selection: decide after detection if none forced.
-# Default scope: project, unless --global given.
-if [[ -z "$SCOPE_PROJECT$SCOPE_GLOBAL" ]]; then SCOPE_PROJECT=1; fi
 
 info()  { printf '%s\n' "$*"; }
 warn()  { printf 'WARN: %s\n' "$*" >&2; }
@@ -127,6 +146,10 @@ resolve_source() {
   for f in "${COMMAND_FILES[@]}"; do
     fetch "$base/commands/$f" "$TMP_DIR/commands/$f"
   done
+  mkdir -p "$TMP_DIR/prompts"
+  for f in "${PI_PROMPT_FILES[@]}"; do
+    fetch "$base/prompts/$f" "$TMP_DIR/prompts/$f"
+  done
   # sanity: SKILL.md must look like a skill (YAML frontmatter)
   IFS= read -r firstline < "$TMP_DIR/SKILL.md" || true
   [[ "$firstline" == "---" ]] || die "Fetched SKILL.md does not start with '---'; refusing to install."
@@ -140,57 +163,129 @@ fetch() {
   [[ -s "$out" ]] || die "Downloaded empty file: $url"
 }
 
-# --- detect agents -----------------------------------------------------------
+# --- scope and config prompts ------------------------------------------------
 
 PROJECT_ROOT="$PWD"
 GLOBAL_ROOT="$HOME"
+
+tty_readable() { [[ -r /dev/tty ]]; }
+
+ask_yes_no() {
+  local prompt="$1" reply
+  [[ $ASSUME_YES -eq 1 ]] && return 1
+  [[ $DRY_RUN -eq 1 ]] && return 1
+  tty_readable || return 1
+  read -r -p "$prompt [y/N] " reply </dev/tty 2>/dev/null || return 1
+  [[ "$reply" == [yY] || "$reply" == [yY][eE][sS] ]]
+}
+
+ask_yes_no_default_yes() {
+  local prompt="$1" reply
+  [[ $ASSUME_YES -eq 1 ]] && return 0
+  [[ $DRY_RUN -eq 1 ]] && return 0
+  tty_readable || return 0
+  read -r -p "$prompt [Y/n] " reply </dev/tty 2>/dev/null || return 0
+  [[ -z "$reply" || "$reply" == [yY] || "$reply" == [yY][eE][sS] ]]
+}
+
+env_truthy() {
+  local val="${1:-}"
+  [[ "$val" == [1yYtT]* || "$val" == [yY][eE][sS] ]]
+}
+
+choose_scope() {
+  if [[ -n "$SCOPE_PROJECT$SCOPE_GLOBAL" ]]; then return; fi
+
+  if [[ $ASSUME_YES -eq 1 ]]; then
+    if [[ -n "${DW_INSTALL_GLOBAL:-}" ]]; then
+      env_truthy "$DW_INSTALL_GLOBAL" && SCOPE_GLOBAL=1
+    else
+      SCOPE_GLOBAL=1
+    fi
+    if [[ -n "${DW_INSTALL_PROJECT:-}" ]]; then
+      env_truthy "$DW_INSTALL_PROJECT" && SCOPE_PROJECT=1
+    fi
+    return
+  fi
+
+  if ask_yes_no_default_yes "Install Diffwarden globally so /dw works in all projects?"; then
+    SCOPE_GLOBAL=1
+  fi
+  if ask_yes_no "Install into current project too?"; then
+    SCOPE_PROJECT=1
+  fi
+  [[ -n "$SCOPE_PROJECT$SCOPE_GLOBAL" ]] || die "No install scope selected."
+}
+
+choose_orchestration_config() {
+  if [[ $ASSUME_YES -eq 1 ]]; then
+    if [[ -n "${DW_INSTALL_CONFIG:-}" ]]; then
+      env_truthy "$DW_INSTALL_CONFIG" && WANT_CONFIG=1
+    fi
+  else
+    if ask_yes_no "Configure orchestration model defaults?"; then
+      WANT_CONFIG=1
+    fi
+  fi
+}
+
+# --- detect agents -----------------------------------------------------------
 
 has_dir() { [[ -d "$1" ]]; }
 
 detect_summary() {
   local c_proj="no" c_glob="no" u_proj="no" u_glob="no" x_proj="no" x_glob="no"
+  local p_proj="no" p_glob="no"
   has_dir "$PROJECT_ROOT/.claude" && c_proj="yes"
   has_dir "$GLOBAL_ROOT/.claude"  && c_glob="yes"
   has_dir "$PROJECT_ROOT/.cursor" && u_proj="yes"
   has_dir "$GLOBAL_ROOT/.cursor"  && u_glob="yes"
   { has_dir "$PROJECT_ROOT/.codex" || has_dir "$PROJECT_ROOT/.agents"; } && x_proj="yes"
   { has_dir "$GLOBAL_ROOT/.codex"  || has_dir "$GLOBAL_ROOT/.agents"; }  && x_glob="yes"
+  { has_dir "$PROJECT_ROOT/.pi" || has_dir "$PROJECT_ROOT/.pi/skills"; } && p_proj="yes"
+  { has_dir "$GLOBAL_ROOT/.pi/agent" || has_dir "$GLOBAL_ROOT/.pi"; } && p_glob="yes"
   info "Detected config dirs:"
   info "  Claude Code  project(.claude): $c_proj   global(~/.claude): $c_glob"
   info "  Cursor       project(.cursor): $u_proj   global(~/.cursor): $u_glob"
   info "  Codex        project(.agents/.codex): $x_proj   global(~/.agents/~/.codex): $x_glob"
+  info "  Pi Agent     project(.pi): $p_proj   global(~/.pi/agent): $p_glob"
 }
 
 # Decide default agent set: if user forced neither, pick agents that have a dir
 # at the chosen scope; if none detected, ask (or, with -y, default to Claude).
 choose_agents() {
-  if [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX" ]]; then return; fi
-  local claude_seen=0 cursor_seen=0 codex_seen=0
-  [[ -n "$SCOPE_PROJECT" ]] && { has_dir "$PROJECT_ROOT/.claude" && claude_seen=1; has_dir "$PROJECT_ROOT/.cursor" && cursor_seen=1; { has_dir "$PROJECT_ROOT/.codex" || has_dir "$PROJECT_ROOT/.agents"; } && codex_seen=1; }
-  [[ -n "$SCOPE_GLOBAL"  ]] && { has_dir "$GLOBAL_ROOT/.claude"  && claude_seen=1; has_dir "$GLOBAL_ROOT/.cursor"  && cursor_seen=1; { has_dir "$GLOBAL_ROOT/.codex" || has_dir "$GLOBAL_ROOT/.agents"; } && codex_seen=1; }
-  if [[ $claude_seen -eq 0 && $cursor_seen -eq 0 && $codex_seen -eq 0 ]]; then
+  if [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX$WANT_PI" ]]; then return; fi
+  local claude_seen=0 cursor_seen=0 codex_seen=0 pi_seen=0
+  [[ -n "$SCOPE_PROJECT" ]] && {
+    has_dir "$PROJECT_ROOT/.claude" && claude_seen=1
+    has_dir "$PROJECT_ROOT/.cursor" && cursor_seen=1
+    { has_dir "$PROJECT_ROOT/.codex" || has_dir "$PROJECT_ROOT/.agents"; } && codex_seen=1
+    { has_dir "$PROJECT_ROOT/.pi" || has_dir "$PROJECT_ROOT/.pi/skills"; } && pi_seen=1
+  }
+  [[ -n "$SCOPE_GLOBAL" ]] && {
+    has_dir "$GLOBAL_ROOT/.claude"  && claude_seen=1
+    has_dir "$GLOBAL_ROOT/.cursor"  && cursor_seen=1
+    { has_dir "$GLOBAL_ROOT/.codex" || has_dir "$GLOBAL_ROOT/.agents"; } && codex_seen=1
+    { has_dir "$GLOBAL_ROOT/.pi/agent" || has_dir "$GLOBAL_ROOT/.pi"; } && pi_seen=1
+  }
+  if [[ $claude_seen -eq 0 && $cursor_seen -eq 0 && $codex_seen -eq 0 && $pi_seen -eq 0 ]]; then
     if [[ $ASSUME_YES -eq 1 ]]; then
       WANT_CLAUDE=1
       warn "No agent dirs detected; defaulting to Claude Code (--yes)."
     else
-      info "No Claude Code, Cursor, or Codex config dir detected at the chosen scope."
-      ask_yes_no "Install for Claude Code anyway?" && WANT_CLAUDE=1
-      ask_yes_no "Install for Cursor anyway?"      && WANT_CURSOR=1
-      ask_yes_no "Install for Codex anyway?"       && WANT_CODEX=1
+      info "No Claude Code, Cursor, Codex, or Pi config dir detected at the chosen scope."
+      if ask_yes_no "Install for Claude Code anyway?"; then WANT_CLAUDE=1; fi
+      if ask_yes_no "Install for Cursor anyway?"; then WANT_CURSOR=1; fi
+      if ask_yes_no "Install for Codex anyway?"; then WANT_CODEX=1; fi
+      if ask_yes_no "Install for Pi Agent anyway?"; then WANT_PI=1; fi
     fi
   else
     [[ $claude_seen -eq 1 ]] && WANT_CLAUDE=1
     [[ $cursor_seen -eq 1 ]] && WANT_CURSOR=1
     [[ $codex_seen -eq 1 ]] && WANT_CODEX=1
+    [[ $pi_seen -eq 1 ]] && WANT_PI=1
   fi
-  [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX" ]] || die "No agents selected; nothing to do."
-}
-
-ask_yes_no() {
-  local prompt="$1" reply
-  [[ $ASSUME_YES -eq 1 ]] && return 0
-  read -r -p "$prompt [y/N] " reply </dev/tty || return 1
-  [[ "$reply" == [yY] || "$reply" == [yY][eE][sS] ]]
+  [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX$WANT_PI" ]] || die "No agents selected; nothing to do."
 }
 
 # --- install one file --------------------------------------------------------
@@ -209,6 +304,36 @@ install_file() {
     "$PROJECT_ROOT"/.claude/*|"$PROJECT_ROOT"/.cursor/*|"$PROJECT_ROOT"/.agents/*|"$GLOBAL_ROOT"/.claude/*|"$GLOBAL_ROOT"/.cursor/*|"$GLOBAL_ROOT"/.agents/*) ;;
     *) die "Refusing to write outside known config dirs: $dest" ;;
   esac
+
+  _install_copy "$src" "$dest"
+}
+
+# install_pi_file <src> <dest> <pi-root>
+install_pi_file() {
+  local src="$1" dest="$2" pi_root="$3"
+  [[ -f "$src" ]] || die "Missing source file: $src"
+
+  case "$dest" in
+    "$pi_root"/skills/*|"$pi_root"/prompts/*) ;;
+    *) die "Refusing to write outside Pi skills/prompts dirs: $dest" ;;
+  esac
+
+  _install_copy "$src" "$dest"
+}
+
+# install_config_file <dest>
+install_config_file() {
+  local dest="$1"
+  case "$dest" in
+    "$CONFIG_DIR"/*) ;;
+    *) die "Refusing to write outside ~/.config/diffwarden/: $dest" ;;
+  esac
+  _install_copy_from_string "$CONFIG_CONTENT" "$dest"
+}
+
+# _install_copy <src> <dest>
+_install_copy() {
+  local src="$1" dest="$2"
 
   if [[ -f "$dest" ]]; then
     if cmp -s "$src" "$dest"; then
@@ -236,6 +361,51 @@ install_file() {
   INSTALLED=$((INSTALLED+1))
 }
 
+# _install_copy_from_string <content> <dest>
+_install_copy_from_string() {
+  local content="$1" dest="$2" tmp
+  tmp="$(mktemp)"
+  printf '%s' "$content" > "$tmp"
+  _install_copy "$tmp" "$dest"
+  rm -f "$tmp"
+}
+
+# resolve_pi_root <scope-root> <default-relative>
+resolve_pi_root() {
+  local scope_root="$1" default_rel="$2" resolved
+  if [[ -n "$PI_ROOT" ]]; then
+    resolved="$PI_ROOT"
+    if [[ "$resolved" == "~"* ]]; then
+      resolved="${resolved/#\~/$HOME}"
+    fi
+    if [[ "$resolved" != /* ]]; then
+      resolved="$scope_root/$resolved"
+    fi
+  else
+    resolved="$scope_root/$default_rel"
+  fi
+  if [[ $DRY_RUN -eq 1 ]]; then
+    if [[ -d "$resolved" ]]; then
+      (cd "$resolved" && pwd)
+    else
+      local parent="${resolved%/*}" name="${resolved##*/}"
+      if [[ -d "$parent" ]]; then
+        printf '%s/%s\n' "$(cd "$parent" && pwd)" "$name"
+      else
+        printf '%s\n' "$resolved"
+      fi
+    fi
+    return
+  fi
+  mkdir -p "$resolved"
+  (cd "$resolved" && pwd)
+}
+
+install_orchestration_config() {
+  info "Orchestration config (global):"
+  install_config_file "$CONFIG_FILE"
+}
+
 # install_target <root> <scope-label>
 install_target() {
   local root="$1" label="$2" f
@@ -258,6 +428,20 @@ install_target() {
     install_file "$SRC_DIR/SKILL.md" "$root/.agents/skills/$SKILL_NAME/SKILL.md"
     info "  → invoke in Codex CLI with \$diffwarden <args> or /skills (not /dw or /diffwarden)."
   fi
+  if [[ -n "$WANT_PI" ]]; then
+    local pi_root
+    if [[ "$label" == "project" ]]; then
+      pi_root="$(resolve_pi_root "$root" ".pi")"
+    else
+      pi_root="$(resolve_pi_root "$root" ".pi/agent")"
+    fi
+    info "Pi Agent ($label, root=$pi_root):"
+    install_pi_file "$SRC_DIR/SKILL.md" "$pi_root/skills/$SKILL_NAME/SKILL.md" "$pi_root"
+    for f in "${PI_PROMPT_FILES[@]}"; do
+      install_pi_file "$SRC_DIR/prompts/$f" "$pi_root/prompts/$f" "$pi_root"
+    done
+    info "  → restart Pi Agent or run /reload after installing."
+  fi
 }
 
 # --- run ---------------------------------------------------------------------
@@ -265,13 +449,26 @@ install_target() {
 info "Diffwarden installer"
 info "===================="
 resolve_source
-detect_summary
-choose_agents
+choose_scope
+choose_orchestration_config
+
+if [[ -z "$WANT_PI" || -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX" ]]; then
+  detect_summary
+  choose_agents
+elif [[ -z "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX" ]]; then
+  WANT_PI=1
+fi
 
 info ""
 info "Plan:"
-info "  agents : ${WANT_CLAUDE:+Claude }${WANT_CURSOR:+Cursor }${WANT_CODEX:+Codex}"
+if [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX$WANT_PI" ]]; then
+  info "  agents : ${WANT_CLAUDE:+Claude }${WANT_CURSOR:+Cursor }${WANT_CODEX:+Codex }${WANT_PI:+Pi }"
+else
+  info "  agents : (none)"
+fi
 info "  scope  : ${SCOPE_PROJECT:+project($PROJECT_ROOT) }${SCOPE_GLOBAL:+global($GLOBAL_ROOT)}"
+[[ -n "$PI_ROOT" ]] && info "  pi-root: $PI_ROOT"
+[[ $WANT_CONFIG -eq 1 ]] && info "  config : $CONFIG_FILE"
 [[ $DRY_RUN -eq 1 ]] && info "  (dry run — no files will be written)"
 info ""
 
@@ -279,14 +476,22 @@ if [[ $DRY_RUN -ne 1 && $ASSUME_YES -ne 1 ]]; then
   ask_yes_no "Proceed?" || { info "Aborted."; exit 0; }
 fi
 
-[[ -n "$SCOPE_PROJECT" ]] && install_target "$PROJECT_ROOT" "project"
-[[ -n "$SCOPE_GLOBAL"  ]] && install_target "$GLOBAL_ROOT"  "global"
+if [[ $WANT_CONFIG -eq 1 ]]; then
+  install_orchestration_config
+fi
+
+if [[ -n "$SCOPE_PROJECT" ]]; then
+  install_target "$PROJECT_ROOT" "project"
+fi
+if [[ -n "$SCOPE_GLOBAL" ]]; then
+  install_target "$GLOBAL_ROOT" "global"
+fi
 
 info ""
 info "Done. installed=$INSTALLED  up-to-date=$SKIPPED  kept-existing=$KEPT"
 if [[ $DRY_RUN -ne 1 && $INSTALLED -gt 0 ]]; then
-  if [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX" ]]; then
-    info "Restart your agent session (or /clear in Codex) to pick up new skills/commands."
+  if [[ -n "$WANT_CLAUDE$WANT_CURSOR$WANT_CODEX$WANT_PI" ]]; then
+    info "Restart your agent session (or /clear in Codex, /reload in Pi) to pick up new skills/commands."
   fi
 fi
 exit 0
