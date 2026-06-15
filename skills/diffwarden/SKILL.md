@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code and Cursor; Codex CLI uses $diffwarden or /skills."
-version: 0.24.0
+version: 0.24.1
 author: jperocho
 license: MIT
 metadata:
@@ -37,7 +37,7 @@ does not auto-merge, force-push, or weaken CI/tests/lint/auth/secrets.
 
 ## Caveman Mode (extra token savings)
 
-v0.24.0 defaults to **lean output** — short findings, `cN/5` loop lines, compact
+v0.24.1 defaults to **lean output** — short findings, `cN/5` loop lines, compact
 status (see Lean Output). Lean is agent-neutral, not caveman-specific.
 
 The optional `caveman` skill compresses output further (~75%) when `--verbose`
@@ -227,7 +227,7 @@ Expand and print the matching banner.
 |------------|----------|
 | `review` | Read-only. Collect evidence, classify, score — no edits unless `--comment` posts after approval. |
 | `loop` | Review → fix safe issues → verify → rescore → repeat until `c5/5`, `--mvp` at `c4/5`, or max iterations. Local edits only unless `--commit` / `--push`. |
-| `status` | Score/snapshot only — Status, Confidence level, Scope. |
+| `status` | Score/snapshot only — Status, Level. |
 | `comment` | PR-only. Same evidence as `review`, then short summary + inline P comments after explicit approval. |
 | `help` | Short help; `--verbose` for advanced flags. No loop. |
 
@@ -794,7 +794,7 @@ Git repo with no branch/detached HEAD: treat as workspace (local-only).
 
 ### Workspace score
 
-Same confidence scale; stamp `Scope: workspace`:
+Same confidence scale:
 
 ```text
 c5/5 clean
@@ -808,8 +808,7 @@ Final lean status:
 
 ```text
 Status: ready | not-ready | blocked
-Confidence level: N/5
-Scope: workspace
+Level: N/5
 ```
 
 ### Must not do in workspace mode
@@ -853,7 +852,7 @@ protection guards, and the loop with `--max-iterations`.
 verifies — never commits or pushes unless `--commit` (git-local only, after
 verification). `--push` rejected for local/staged/worktree.
 
-`status local` is valid — reports Status, Confidence level, Scope: local.
+`status local` is valid — reports Status, Level.
 
 `comment`, `--push` on local targets are rejected (see Invalid combinations).
 
@@ -918,8 +917,7 @@ Lean output (default):
 
 ```text
 Status: ready | not-ready | blocked
-Confidence level: N/5
-Scope: local
+Level: N/5
 ```
 
 With `--verbose`, use Full Report Format. Set `PR: n/a (local <scope>)`. Omit
@@ -979,7 +977,7 @@ c2/5 incorrect order, broken instruction, major gap
 c1/5 dangerous/security-risk instruction
 ```
 
-Stamp `checks: n/a (document)` and `Scope: document` (or filepath).
+Stamp `checks: n/a (document)`.
 
 ### Document loop output (lean default)
 
@@ -1009,8 +1007,7 @@ Findings:
 - P2 docs/install.md:32 — install path not defined before copy
 
 Status: not-ready
-Confidence level: 3/5
-Scope: document
+Level: 3/5
 ```
 
 `PR: n/a (document <filepath>)`. With `--verbose`, use Full Report Format.
@@ -1165,7 +1162,7 @@ gh api repos/$OWNER/$REPO/pulls/<PR_NUMBER>/comments --paginate \
 # CI logs — fetch only for checks that NEWLY entered FAILURE this iteration.
 ```
 
-**Verdict is always against a full pull.** Never declare `5/5` merge-ready on a
+**Readiness is always against a full pull.** Never declare `5/5` merge-ready on a
 delta. The iteration that would assert merge-ready must first do one full
 re-collection. Delta speeds the middle of the loop; the final decision always
 sees the complete picture. (Loop Algorithm step 14 enforces this.)
@@ -1630,8 +1627,10 @@ c4/5 mvp-ready — only P3/info remains
 c5/5 clean
 ```
 
-Rules: start with `cN/5`; one top issue only; one line; no long evidence/plan
-unless `--verbose`. If blocked, one short reason + suggested next command.
+Rules: iteration lines start with `cN/5`; one top issue only; one line; no long
+evidence/plan unless `--verbose`. If blocked, one short reason + suggested next
+command. When the loop stops for any reason, print final `Status:` and `Level:`
+lines last.
 
 For each iteration:
 
@@ -1835,7 +1834,7 @@ Hard rules:
 ```text
 Findings: One blocking auth issue remains; tests are missing for the changed branch.
 Status: not-ready
-Confidence level: 2/5
+Level: 2/5
 ```
 
 Ready example:
@@ -1843,7 +1842,7 @@ Ready example:
 ```text
 Findings: No blocking issues found.
 Status: ready
-Confidence level: 5/5
+Level: 5/5
 ```
 
 **Inline P comments** (anchored to changed lines when possible):
@@ -1967,6 +1966,12 @@ Use dry-run when risk is unclear or user asks for assessment only.
 
 **Default.** Agent-neutral; not Pi-specific. Use `--verbose` for full report.
 
+Every final `review`, final `loop` report, PR comment summary, status snapshot,
+and verbose report ends with `Status:` then `Level:`. Do not add extra final
+fields or headings. Do not end a final review with only `cN/5` progress lines.
+
+`help` has no status footer.
+
 ### Review output (default)
 
 ```text
@@ -1975,32 +1980,33 @@ Findings:
 - P2 tests/auth.test.ts — missing coverage for denied update
 
 Status: not-ready
-Confidence level: 2/5
+Level: 2/5
 ```
-
-Add `Scope: workspace | local | staged | PR #123 | document` when useful.
 
 ### Loop output (default)
 
-One line per iteration only:
+One line per iteration, then final `Status:` and `Level:` lines:
 
 ```text
 c2/5 P1 src/auth.ts:44 — missing ownership check
 c5/5 clean
+
+Status: ready
+Level: 5/5
 ```
 
 ### Status output (default)
 
 ```text
 Status: ready | not-ready | blocked
-Confidence level: N/5
-Scope: workspace | local | staged | PR #123 | document
+Level: N/5
 ```
 
 ### Verbose mode (`--verbose`)
 
 Restores full sections: Iterations, Findings counts, Comment replies,
-Verification, Changed files, Risks, Sources, Next action, How to test, Verdict.
+Verification, Changed files, Risks, Sources, Next action, How to test, and final
+status.
 See Final Report Format.
 
 Safety/blocking messages may appear even in lean mode.
@@ -2104,7 +2110,7 @@ roles but preserve role boundaries logically.
 ### Output rule
 
 Even in orchestrated mode, **no subagent transcripts**. Output stays lean
-`cN/5` lines only.
+`cN/5` iteration lines plus final `Status:` and `Level:` lines.
 
 ## Final Report Format
 
@@ -2154,10 +2160,8 @@ Next action:
 How to test:                       # loop with code changes only
 - Setup / Exercise / Expect
 
-Verdict:
-- Status: ready | not-ready | blocked | user decision needed
-- Confidence level: N/5 @ <head-sha> (checks: passing | pending | failing | n/a)
-- Scope: workspace | local | staged | PR #123 | document
+Status: ready | not-ready | blocked | user decision needed
+Level: N/5 @ <head-sha> (checks: passing | pending | failing | n/a)
 ```
 
 **PR comment summary** (`comment` / `--comment`) — lean only, not verbose:
@@ -2165,7 +2169,7 @@ Verdict:
 ```text
 Findings: <short general summary>
 Status: ready | not-ready
-Confidence level: N/5
+Level: N/5
 ```
 
 **Inline P comments** on changed lines when possible:
@@ -2186,8 +2190,8 @@ Explicit user approval required each run even when `comment` was typed.
 
 When the run **changed code** — `loop` in code/workspace/git-local mode — add a
 `How to test` block in **verbose** output only, placed after `Next action` and
-before `Verdict`. Skip on read-only runs (`review`, `status`, `comment`,
-document `review`, `--dry-run`) and document `loop`.
+before final `Status:` and `Level:` lines. Skip on read-only runs (`review`,
+`status`, `comment`, document `review`, `--dry-run`) and document `loop`.
 
 Give concrete, runnable steps, not vague advice. Structure each as:
 
@@ -2308,7 +2312,7 @@ Before final answer:
 - [ ] **Git-local** (`local`/`staged`/`worktree`): git required; no push unless PR mode with `--push`; `status local` valid.
 - [ ] **Document mode:** filepath exists; read-only `review` never edits; `loop` backs up `.orig`; never executes doc commands; document score `cN/5`.
 - [ ] **PR mode:** `OWNER/REPO` resolved from PR ref; Phase 2 gate passed; head SHA pinned for review-only.
-- [ ] Lean output default: review = Findings + Status + Confidence; loop = `cN/5` lines; status = Status + Confidence + Scope. `--verbose` for full report.
+- [ ] Lean output default: review/comment/verbose end with `Status:` + `Level:`; loop prints `cN/5` iteration lines, then the same final two lines; status snapshots use `Status:` + `Level:`. `--verbose` for full report.
 - [ ] `--mvp` stops at `c4/5`; default max 3 (workspace/document default 5); hard max 5.
 - [ ] `--commit`/`--push` only when explicit; `--push` rejected for workspace/local/staged/document.
 - [ ] `comment` PR-only; short summary + inline P comments; approval + head SHA recheck + dedupe; `COMMENT` only.

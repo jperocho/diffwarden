@@ -19,7 +19,7 @@
 # SECURITY: read this script before running it. The recommended way to install
 # is download-then-inspect-then-run, not pipe-to-shell. See the README.
 #
-#   curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.24.0/install.sh
+#   curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.24.1/install.sh
 #   less install.sh        # read it
 #   bash install.sh        # then run it
 #
@@ -46,7 +46,7 @@
 #   -f, --force         Overwrite files that differ, without prompting.
 #   --dry-run           Print the plan and exit; write nothing.
 #   --ref <ref>         Git ref/tag to fetch from when run outside the repo
-#                       (default: v0.24.0). Ignored when run inside a clone.
+#                       (default: v0.24.1). Ignored when run inside a clone.
 #   -h, --help          Show this help and exit.
 
 set -euo pipefail
@@ -54,7 +54,7 @@ set -euo pipefail
 # --- constants ---------------------------------------------------------------
 
 SKILL_NAME="diffwarden"
-DEFAULT_REF="v0.24.0"
+DEFAULT_REF="v0.24.1"
 RAW_BASE="https://raw.githubusercontent.com/jperocho/diffwarden"
 COMMAND_FILES=("dw.md" "diffwarden.md")
 PI_PROMPT_FILES=("dw.md" "diffwarden.md")
