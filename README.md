@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.24.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.24.1-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -35,7 +35,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). v0.24.0 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). v0.24.1 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs command files in Claude Code/Cursor. **Codex CLI is different** — see [Codex CLI](#codex-cli): use `$diffwarden` or `/skills`, not `/dw` or `/diffwarden`.
 
@@ -49,8 +49,8 @@ Invoke with `/diffwarden` (or the optional `/dw` alias). v0.24.0 uses five prima
 
 **Targets:**
 
-| Target | Scope |
-|--------|-------|
+| Target | Meaning |
+|--------|---------|
 | `workspace` | Current folder — git not required (see [Workspace review](#workspace-review-no-git-required)) |
 | `local` / `staged` | Git working tree or staged changes, no PR |
 | `#123`, PR URL, or omitted | GitHub PR (current branch when omitted) |
@@ -220,16 +220,19 @@ or a `.md` docs target) — document critique grounds against your repo, not the
 
 ### Lean output (default)
 
-Loop prints one line per iteration — no long evidence blocks unless `--verbose`:
+Loop prints one line per iteration, then final `Status:` and `Level:` lines — no long evidence blocks unless `--verbose`:
 
 ```text
 c2/5 P1 src/auth.ts:44 — missing ownership check
 c3/5 P2 tests missing for changed branch
 c4/5 mvp-ready — only P3/info remains
 c5/5 clean
+
+Status: ready
+Level: 5/5
 ```
 
-Review output is also lean by default:
+Every final review ends with `Status:` then `Level:`. Review output is also lean by default:
 
 ```text
 Findings:
@@ -237,7 +240,7 @@ Findings:
 - P2 tests/auth.test.ts — missing coverage for denied update
 
 Status: not-ready
-Confidence level: 2/5
+Level: 2/5
 ```
 
 Use `--verbose` for the full report (iterations, verification, changed files, risks, next action, how to test).
@@ -417,7 +420,7 @@ Restart Pi Agent or run `/reload` after installing. Without prompt templates, in
 
 ### Extension note
 
-A Pi extension is not required for v0.24.0. Use the skill and prompt templates first.
+A Pi extension is not required for v0.24.1. Use the skill and prompt templates first.
 
 Consider a Pi extension later only if Diffwarden needs native Pi command behavior beyond prompt expansion, custom compact progress UI, persistent review state, shell/tool interception, custom file scanning, or custom confirmation dialogs.
 
@@ -451,7 +454,7 @@ asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.24.0/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.24.1/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -810,4 +813,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.24.0`
+Current version: `v0.24.1`

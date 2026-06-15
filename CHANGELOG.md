@@ -4,6 +4,14 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.24.1] - 2026-06-15
+
+### Fixed
+
+- Restored the mandatory final status lines for lean, verbose, status, and PR
+  comment output. Final reviews now end with `Status:` followed by `Level:`,
+  without extra final fields or headings.
+
 ## [0.24.0] - 2026-06-13
 
 ### Added
@@ -18,7 +26,7 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 - Added `--orchestrate` for optional reviewer/fixer role split.
 - Added orchestration model defaults via global config and project override.
 - Added safe config precedence for optional orchestration.
-- Added short PR comment format: Findings, Status, Confidence level.
+- Added short PR comment format: Findings, Status, Level.
 - Added explicit PR comment posting safety: approval, head-SHA recheck, dedupe, and COMMENT-only reviews.
 - Added workspace edit backups before non-git workspace fixes.
 - Added document backups before document fixes.
@@ -249,9 +257,10 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 
 - **"How to test" in fix/prepare reports.** When a run changes code (`fix` or
   `prepare`, any target), the report now adds a grounded `How to test` block
-  between `Next action` and `Verdict` — concrete setup / exercise / expect steps
-  a human can run by hand. Included in posted review bodies (`--comment`) and in
-  `fixed` thread replies (`--reply`). Omitted on read-only runs.
+  between `Next action` and the final status lines — concrete setup / exercise /
+  expect steps a human can run by hand. Included in posted review bodies
+  (`--comment`) and in `fixed` thread replies (`--reply`). Omitted on read-only
+  runs.
 - **Hallucination guard for test steps.** Every command, path, flag, and
   expected output in a `How to test` block must trace to real evidence (the
   diff, a discovered script, a command actually run, a confirmed binary).
@@ -261,10 +270,10 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 
 ### Changed
 
-- **Final report puts the verdict last.** Status, Confidence, and Scope now
-  print at the bottom of the report under a `Verdict:` heading, after
-  `Next action`, instead of at the top. Lets the reader scan findings →
-  verification → next action → verdict in order.
+- **Final report puts readiness last.** Status, confidence, and target context
+  print at the bottom of the report, after `Next action`, instead of at the top.
+  Lets the reader scan findings → verification → next action → readiness in
+  order.
 
 ## [0.14.0] - 2026-06-05
 

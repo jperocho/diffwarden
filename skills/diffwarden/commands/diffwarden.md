@@ -13,7 +13,7 @@ The user text after this command (if any) is a Diffwarden invocation. Parse per 
 - `review`/`loop` auto-detect code vs document mode per skill **Target Auto-Detection**; `--as-code`/`--as-plan` override. `comment` is PR-only.
 - `--web` is opt-in per-finding consent; valid on `review`/`loop` (code targets); rejected on `status` and document mode.
 - `--orchestrate` enables optional reviewer/fixer role split; off by default. Model flags override config when set.
-- Default output is lean (`cN/5` loop lines); `--verbose` restores full report.
+- Default output is lean (`cN/5` loop lines plus final `Status:`/`Level:` lines); `--verbose` restores full report.
 
 Examples: `loop workspace`, `review #123`, `comment #123`, `status local`, `loop docs/install.md --as-plan`, `review --security`, `loop --orchestrate`, `loop --mvp`, `review #123 --web`.
 
