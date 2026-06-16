@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code and Cursor; Codex CLI uses $diffwarden or /skills."
-version: 0.24.1
+version: 0.25.0
 author: jperocho
 license: MIT
 metadata:
@@ -37,7 +37,7 @@ does not auto-merge, force-push, or weaken CI/tests/lint/auth/secrets.
 
 ## Caveman Mode (extra token savings)
 
-v0.24.1 defaults to **lean output** — short findings, `cN/5` loop lines, compact
+v0.25.0 defaults to **lean output** — short findings, `cN/5` loop lines, compact
 status (see Lean Output). Lean is agent-neutral, not caveman-specific.
 
 The optional `caveman` skill compresses output further (~75%) when `--verbose`
@@ -1254,7 +1254,9 @@ is rejected as a no-op (see Invalid combinations).
 The orchestrator enumerates coverage from raw output and grounds every claim
 against raw source; subagents may compress *content* but can never remove a file,
 clean a file, decide severity, or declare merge-ready. A missed or fabricated
-finding therefore cannot reach the verdict.
+finding therefore cannot reach the verdict. Findings promoted from delegated
+digests must satisfy **Evidence-Based Findings** (anchor + quote) after
+orchestrator grounding.
 
 ## Classification Taxonomy
 
@@ -1262,7 +1264,8 @@ Classify every finding as one of these.
 
 ### Actionable
 
-Needs a code, test, documentation, or config change now.
+Needs a code, test, documentation, or config change now. Each actionable finding
+must satisfy **Evidence-Based Findings** (anchor + quote).
 
 Examples:
 
@@ -1328,6 +1331,47 @@ Use this priority order:
 - P3 low/info: polish, optional style, context note.
 
 Security findings are blocking until fixed, disproven with evidence, or explicitly accepted by the user.
+
+## Evidence-Based Findings
+
+Every **actionable** finding must be grounded in evidence gathered this run —
+not model memory or guesswork. Applies to lean and verbose output, fix plans,
+PR comments, and posted reviews.
+
+### Anchor (required for actionable findings)
+
+Cite one:
+
+- `file:line`
+- check name (CI)
+- PR field (`title` / `body`)
+- comment or thread id
+
+Plus a **verbatim quote**, diff hunk, or log excerpt. Unanchorable items stay
+in the summary only — not inline P comments.
+
+### Evidence source
+
+In verbose output, tag each actionable finding as one of:
+
+- `diff`
+- `file read`
+- `CI log`
+- `grounded verify`
+
+### Severity without proof
+
+- Low-confidence guesses → informational or needs user decision; never P0/P1
+  without local proof.
+- P0/P1/security → blocking only with anchor + quote (or terminal CI failure).
+
+### Cross-links
+
+- **Fix Planning Protocol** — `Will change` / `Will run` must ground here.
+- **Delegated Reads** — subagent output is leads only; promoted findings obey
+  anchor + quote after orchestrator grounding.
+- **Hallucination Guard** — hard rule for commands/paths in all output.
+- **Verification Strategy** — discovered commands only; see `verify:` reporting.
 
 ## Confidence Score
 
@@ -1484,24 +1528,23 @@ Before edits, produce a compact fix plan:
 
 ```text
 Findings:
-1. [ACTIONABLE][P1/security] file:line — issue
-   Evidence: ...
+1. [ACTIONABLE][P1/security] <anchor> — issue
+   Evidence: <verbatim quote or diff hunk> (source: diff | file read | CI log | grounded verify)
    Fix: ...
-   Verify: ...
+   Verify: <discovered command only>
 
 Will change:
-- path/to/file.ext
-- tests/path/to/test.ext
+- path/to/file.ext   # in diff or read this run only
 
 Will run:
-- exact test/lint commands
+- exact test/lint commands   # script/target must exist in manifests
 
 Will not change:
 - unrelated files
 - public API unless approved
 
 Planned comment replies (if --reply-comments):
-- comment-id / path:line — [type] draft reply
+- comment-id / <anchor> — [type] draft reply
 ```
 
 Rules:
@@ -1512,6 +1555,11 @@ Rules:
 - Add/adjust tests when behavior changes.
 - Do not weaken tests, lints, branch protection, or CI workflows to pass checks.
 - If diff grows beyond about 500 lines, stop and ask unless the user requested a large fix.
+- `Will change` names only files in the diff or explicitly read this run.
+- `Will run` lists only commands discovered per **Verification Strategy** — never
+  assumed runners or scripts.
+- No unrelated files, deleted tests without reason, fake test updates, or
+  config/security weakening to pass checks.
 
 ## Applying Fixes
 
@@ -1586,6 +1634,16 @@ Prefer targeted checks first:
 
 Then run broader checks when cheap or required.
 
+Do not assume stack-default commands exist. Use a command only when grounded:
+
+- `npm run <script>` — `<script>` exists in `package.json`
+- `make <target>` — target exists in the Makefile
+- `pytest <path>` / `cargo test -p <pkg>` — path or package exists
+- CI job/step name — appears in `.github/workflows/*` or `gh pr checks`
+
+No grounded command → do not invent a runner. Report `verify: skipped` and cap
+readiness per **Confidence Score** (missing targeted test / no verify → `3/5`).
+
 Examples:
 
 ```bash
@@ -1604,6 +1662,20 @@ Verification report must include:
 - exit code
 - pass/fail
 - important output excerpt
+
+### Verbose verification output (`--verbose` only)
+
+Lean loop keeps one `cN/5` line per iteration. In `--verbose`, loop step 9 also
+prints a structured block:
+
+```text
+verify: pass — `pytest tests/foo.py -q` (exit 0)
+verify: fail — `npm run lint` (exit 1) — <short excerpt>
+verify: skipped — no grounded command detected
+```
+
+Failing verification or a failing required check caps score at `2/5`. Missing
+grounded verification or targeted test → `3/5`, not `4/5`.
 
 If verification fails:
 
@@ -1645,7 +1717,8 @@ For each iteration:
 6. Stop if `--mvp` and `c4/5` or `c5/5`.
 7. If `--orchestrate`, optional reviewer/fixer split (see Optional Orchestration).
 8. Fix one safe scoped top blocker.
-9. Run grounded verification.
+9. Run grounded verification; in `--verbose`, print structured `verify:` block
+   (pass / fail / skipped — see **Verification Strategy**).
 10. Rescore; print lean `cN/5` line.
 11. If `--commit` authorized (git modes, after verification) → commit.
 12. If `--push` authorized (PR mode only, head recheck) → push.
@@ -2142,8 +2215,9 @@ Comment replies:                        # PR mode only
 - Resolved threads: R
 
 Verification:
-- PASS `command`
-- FAIL `command` — reason
+- verify: pass — `command` (exit 0)
+- verify: fail — `command` (exit N) — <short excerpt>
+- verify: skipped — no grounded command detected
 
 Changed files:
 - path
@@ -2186,30 +2260,29 @@ posting; `COMMENT` event only — never approve, request changes, or merge.
 Explicit user approval required each run even when `comment` was typed.
 ```
 
-## How to Test
+## Hallucination Guard
 
-When the run **changed code** — `loop` in code/workspace/git-local mode — add a
-`How to test` block in **verbose** output only, placed after `Next action` and
-before final `Status:` and `Level:` lines. Skip on read-only runs (`review`,
-`status`, `comment`, document `review`, `--dry-run`) and document `loop`.
+Hard rule across all Diffwarden output: never invent facts the run did not
+gather. Applies to **findings**, **fix plans**, **PR comments**, **thread
+replies**, and **How to test** — not only test steps.
 
-Give concrete, runnable steps, not vague advice. Structure each as:
+### Findings and fix plans
 
-- **Setup** (only if needed): the exact command(s) to reach the start state.
-- **Exercise**: the exact command/action that runs the changed behavior.
-- **Expect**: the observable result that proves the fix — a file that appears or
-  does not, a value, an exit code, a log line, a UI state.
+- Every actionable finding needs an **anchor + quote** per **Evidence-Based
+  Findings**. No invented files, symbols, APIs, or line numbers.
+- Fix plans: `Will change` only diff/read files; `Will run` only discovered
+  commands. Low-confidence guesses → informational or needs user decision.
 
-Mirror the change's own shape: a CLI fix gets shell steps + expected output; a
-library fix gets the call + expected return/raise; an API fix gets the request +
-expected status/body. Prefer the verification commands you actually ran this run
-(see Verification Strategy) — they are already grounded.
+### Posted PR output
 
-### Hallucination guard (hard rule)
+- Inline P comments: anchor when possible; same guard on paths, SHAs, and verify
+  commands in summaries and `fixed` replies.
+- A public invented claim is worse than silence — omit ungrounded detail.
 
-Every command, path, flag, env var, and expected output in `How to test` **must
-trace to real evidence** gathered this run. Never invent one. Sources that count
-as grounded:
+### Commands, paths, and expected output
+
+Every command, path, flag, env var, and expected output **must trace to real
+evidence** gathered this run. Never invent one. Sources that count as grounded:
 
 - a path or symbol present in the diff / changed files,
 - a script or target discovered in `package.json`, `Makefile`, `pyproject.toml`,
@@ -2228,8 +2301,28 @@ How to test:
 ```
 
 Do not guess a test runner, a CLI name, a port, a fixture path, or an output
-string. A wrong "how to test" is worse than none: it sends the reviewer chasing
-a command that does not exist. When unsure whether a step is real, drop it.
+string. A wrong step is worse than none. When unsure whether a detail is real,
+drop it.
+
+## How to Test
+
+When the run **changed code** — `loop` in code/workspace/git-local mode — add a
+`How to test` block in **verbose** output only, placed after `Next action` and
+before final `Status:` and `Level:` lines. Skip on read-only runs (`review`,
+`status`, `comment`, document `review`, `--dry-run`) and document `loop`.
+
+Give concrete, runnable steps, not vague advice. Structure each as:
+
+- **Setup** (only if needed): the exact command(s) to reach the start state.
+- **Exercise**: the exact command/action that runs the changed behavior.
+- **Expect**: the observable result that proves the fix — a file that appears or
+  does not, a value, an exit code, a log line, a UI state.
+
+Mirror the change's own shape: a CLI fix gets shell steps + expected output; a
+library fix gets the call + expected return/raise; an API fix gets the request +
+expected status/body. Prefer the verification commands you actually ran this run
+(see Verification Strategy) — they are already grounded. Obey **Hallucination
+Guard** for every step.
 
 ### Example (grounded, CLI change)
 
@@ -2278,10 +2371,10 @@ block in what gets posted:
 - `--post-review`: append the `How to test` block to the review summary body.
 - `--reply`: in each `fixed` thread reply, after the `Verify:` command, add the
   one or two test steps relevant to that specific comment's fix (not the whole
-  report's block). Same hallucination guard — grounded steps only.
+  report's block). Same **Hallucination Guard** — grounded steps only.
 
-The guard is identical online and offline: posting an invented test step to a
-PR is a public, misleading claim. Ground it or omit it.
+The guard is identical online and offline: posting an invented step to a PR is a
+public, misleading claim. Ground it or omit it.
 
 ## Common Pitfalls
 
@@ -2299,7 +2392,8 @@ PR is a public, misleading claim. Ground it or omit it.
 12. **Declaring merge-ready on delta evidence.** Incremental re-collection (iterations 2+) speeds the middle of the loop, but a `5/5` verdict must always rest on a full collection. Do a full re-pull before asserting merge-ready, and fall back to full on a rewritten history or a comment-count mismatch.
 13. **Treating a subagent digest as a finding of record.** Under `--delegate-reads`, a subagent's output is a lead to ground, never a verdict. Enumerate the coverage set raw, grep every `verbatim_quote` against raw source (drop + raw-read on no match), reconcile coverage by set difference, and never delegate a decision or a security file. Worst case, read raw.
 14. **Fabricating "how to test" steps.** A plausible-looking command that does not exist sends the reviewer chasing nothing — worse than no test. Every step in `How to test` (report or PR comment) must trace to real evidence: the diff, a discovered script, a command actually run, a confirmed binary. Cannot ground it → omit it.
-15. **Searching the web silently.** Web grounding is doubly gated: the `--web` flag AND a per-finding `[y/N]` the human answers. Never auto-search, never batch-approve a set of findings, never treat the flag as consent for the call. Never send repo code, diff, secrets, paths, or internal names — only a redacted finding descriptor, shown in the prompt. A web result never raises severity or lifts a safety cap; cite the URL and mark the finding `web-verified`, else it stays `local-only`. `--web` is rejected on `status` and document mode.
+15. **Fabricating findings or fix plans.** Invented `file:line`, symbols, or verify commands in findings, fix plans, or PR comments are the same failure mode as fake test steps. Actionable findings need anchor + quote per **Evidence-Based Findings**; `Will run` lists only discovered commands.
+16. **Searching the web silently.** Web grounding is doubly gated: the `--web` flag AND a per-finding `[y/N]` the human answers. Never auto-search, never batch-approve a set of findings, never treat the flag as consent for the call. Never send repo code, diff, secrets, paths, or internal names — only a redacted finding descriptor, shown in the prompt. A web result never raises severity or lifts a safety cap; cite the URL and mark the finding `web-verified`, else it stays `local-only`. `--web` is rejected on `status` and document mode.
 
 ## Verification Checklist
 
@@ -2319,6 +2413,11 @@ Before final answer:
 - [ ] `--orchestrate` only when flag set; config read only with `--orchestrate` or model flags; fallback line if unavailable; no subagent transcripts.
 - [ ] GitHub auth resolved; preflight gates passed.
 - [ ] Findings classified; confidence `cN/5` from evidence.
+- [ ] Actionable findings have anchor + quote (**Evidence-Based Findings**); no
+  invented paths, symbols, or verify commands (**Hallucination Guard**).
+- [ ] Fix plan `Will change` / `Will run` grounded; verification commands exist
+  in manifests before run.
+- [ ] If `loop` + `--verbose`: structured `verify:` block (pass/fail/skipped).
 - [ ] No force-push, auto-merge, or history rewrite; no human comment resolved without `--resolve` + approval.
 - [ ] Security findings blocking until fixed, disproven, or user-accepted.
 - [ ] If `--web`: per-finding `[y/N]`; redacted descriptor only; `web-verified` vs `local-only`.
