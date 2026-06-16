@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.24.1-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.25.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -35,7 +35,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). v0.24.1 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). v0.25.0 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs command files in Claude Code/Cursor. **Codex CLI is different** — see [Codex CLI](#codex-cli): use `$diffwarden` or `/skills`, not `/dw` or `/diffwarden`.
 
@@ -284,6 +284,14 @@ Score is recomputed from evidence every iteration. **c5/5 does not auto-merge** 
 Safety caps: unresolved P0/security → max `1/5`; failing required check → max `2/5`;
 needs-user-decision → max `3/5` until you decide.
 
+### Evidence-based findings
+
+- Actionable findings need **anchor + quote** — not model guesswork.
+- Anchors: `file:line`, check name, PR field, or comment/thread id.
+- Fix plans: only diff/read files; verify commands must exist in manifests.
+- Verification is built into `loop` (no `--verify` flag on `review`).
+- `--verbose` loop adds structured `verify: pass|fail|skipped` reporting.
+
 ### When it stops before c5/5
 
 | Reason | What to do |
@@ -319,8 +327,10 @@ Given a PR, the agent:
 1. Checks your environment is safe to work in (git repo, logged into GitHub, right branch).
 2. Reads everything: the diff, CI status, inline review comments, bot comments.
 3. Sorts findings into: must-fix now, FYI, already fixed, or "ask the human".
+   Actionable items need anchor + quote (file/line, check, PR field, or comment).
 4. Ranks by severity (P0 security/data-loss down to P3 polish).
-5. Writes a small fix plan, applies safe fixes, and runs your tests/linters to prove they work.
+5. Writes a small fix plan, applies safe fixes, and runs discovered tests/linters
+   to prove they work (`loop` only — `review` is read-only).
 6. Optionally posts the review on GitHub or commits fixes — only if you allow it.
 7. Loops until the PR is merge-ready, blocked, or it needs your decision.
 
@@ -420,7 +430,7 @@ Restart Pi Agent or run `/reload` after installing. Without prompt templates, in
 
 ### Extension note
 
-A Pi extension is not required for v0.24.1. Use the skill and prompt templates first.
+A Pi extension is not required for v0.25.0. Use the skill and prompt templates first.
 
 Consider a Pi extension later only if Diffwarden needs native Pi command behavior beyond prompt expansion, custom compact progress UI, persistent review state, shell/tool interception, custom file scanning, or custom confirmation dialogs.
 
@@ -454,7 +464,7 @@ asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.24.1/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.25.0/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -813,4 +823,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.24.1`
+Current version: `v0.25.0`

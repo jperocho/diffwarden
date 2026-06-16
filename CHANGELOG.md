@@ -4,6 +4,24 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.25.0] - 2026-06-16
+
+### Added
+
+- **Evidence-Based Findings** in `SKILL.md`: actionable findings require an
+  anchor (`file:line`, check name, PR field, or comment/thread id) plus a
+  verbatim quote or diff hunk; low-confidence guesses cannot be P0/P1 without
+  local proof.
+- **Hallucination Guard** expanded beyond `How to test` to cover findings, fix
+  plans, PR comments, and thread replies.
+- Grounded verification discovery: use manifest/workflow targets only when they
+  exist; never invent runners.
+- Structured `verify: pass|fail|skipped` block in `--verbose` loop output.
+- Fix-plan rules: `Will change` / `Will run` must trace to diff/read files and
+  discovered commands only.
+- Delegated-read findings cross-linked to evidence rules; verification checklist
+  updated.
+
 ## [0.24.1] - 2026-06-15
 
 ### Fixed
