@@ -47,6 +47,33 @@ jobs:
           test -f skills/diffwarden/prompts/dw.md
           grep -q '\$ARGUMENTS' skills/diffwarden/prompts/dw.md
 
+      - name: Pi package extension
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const extensions = pkg.pi?.extensions;
+          if (!Array.isArray(extensions) || extensions.length === 0) {
+            throw new Error("package.json must declare pi.extensions");
+          }
+          for (const ext of extensions) {
+            if (typeof ext !== "string") throw new Error("pi.extensions entries must be strings");
+            if (!fs.existsSync(ext)) throw new Error(`Missing Pi extension: ${ext}`);
+          }
+          if (!pkg.peerDependencies?.["@earendil-works/pi-coding-agent"]) {
+            throw new Error("Missing @earendil-works/pi-coding-agent peer dependency");
+          }
+          const extPath = path.normalize(extensions[0]);
+          const source = fs.readFileSync(extPath, "utf8");
+          for (const needle of ["resources_discover", "skillPaths", "registerCommand", "sendUserMessage"]) {
+            if (!source.includes(needle)) throw new Error(`Pi extension missing ${needle}`);
+          }
+          NODE
+          grep -q "pi install git:github.com/jperocho/diffwarden" README.md
+          echo "Pi package extension OK"
+
       - name: Orchestration docs
         run: |
           test -f docs/orchestration.md

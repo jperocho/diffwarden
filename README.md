@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.25.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.26.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
@@ -35,7 +35,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). v0.25.0 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). v0.26.0 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs command files in Claude Code/Cursor. **Codex CLI is different** — see [Codex CLI](#codex-cli): use `$diffwarden` or `/skills`, not `/dw` or `/diffwarden`.
 
@@ -368,9 +368,20 @@ files or config for tokens.
 
 ## Pi Agent
 
-Diffwarden can be used with Pi Agent by installing the skill manually or through the installer.
+Diffwarden can be used with Pi Agent three ways: installer/manual skill copy, prompt templates, or optional Pi package extension.
 
-Pi support is install-only. Diffwarden core behavior stays agent-neutral.
+Diffwarden core behavior stays agent-neutral. The extension only adds native `/dw` and `/diffwarden` commands that forward to `/skill:diffwarden`, plus bundled skill discovery.
+
+### Pi package extension
+
+> Security: Pi extensions run with full local permissions. Review `extensions/diffwarden/index.ts` before installing.
+
+```bash
+pi install git:github.com/jperocho/diffwarden@v0.26.0      # global
+pi install -l git:github.com/jperocho/diffwarden@v0.26.0   # project
+```
+
+The package loads `extensions/diffwarden/index.ts`, which discovers `skills/diffwarden/SKILL.md` from this repo. Restart Pi Agent or run `/reload` after installing.
 
 ### Manual install
 
@@ -388,7 +399,7 @@ cp skills/diffwarden/SKILL.md ~/.pi/agent/skills/diffwarden/SKILL.md
 
 Pi also discovers skills from `.agents/skills/` and `~/.agents/skills/`, so the Codex-compatible install path works in Pi too.
 
-Optional `/dw` and `/diffwarden` aliases should be installed as Pi prompt templates, not as runtime commands or extensions:
+Optional `/dw` and `/diffwarden` aliases can be installed as Pi prompt templates when you do not use the extension package:
 
 ```bash
 # project scope
@@ -404,7 +415,7 @@ cp skills/diffwarden/prompts/diffwarden.md ~/.pi/agent/prompts/diffwarden.md
 
 The prompt templates must pass arguments through with `$ARGUMENTS` so `/dw loop workspace` expands to a Diffwarden invocation with `loop workspace` intact.
 
-Restart Pi Agent or run `/reload` after installing. Without prompt templates, invoke the skill with `/skill:diffwarden` or plain chat.
+Restart Pi Agent or run `/reload` after installing. Without prompt templates or the extension, invoke the skill with `/skill:diffwarden` or plain chat.
 
 ### Installer
 
@@ -428,11 +439,9 @@ Restart Pi Agent or run `/reload` after installing. Without prompt templates, in
 /skill:diffwarden loop workspace
 ```
 
-### Extension note
+### Extension behavior
 
-A Pi extension is not required for v0.25.0. Use the skill and prompt templates first.
-
-Consider a Pi extension later only if Diffwarden needs native Pi command behavior beyond prompt expansion, custom compact progress UI, persistent review state, shell/tool interception, custom file scanning, or custom confirmation dialogs.
+The extension registers native `/dw` and `/diffwarden` commands, offers basic argument completions, and sends `/skill:diffwarden <args>` to the agent. It does not add tool interception, auto-merge, auto-push, file writes, or background processes.
 
 ## Install
 
@@ -464,7 +473,7 @@ asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.25.0/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.26.0/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -744,7 +753,7 @@ preflight -> detect PR -> collect evidence -> classify -> plan fixes -> apply sa
 
 ## Troubleshooting / FAQ
 
-**" `/dw` doesn't show in the `/` menu."** For Claude Code/Cursor, the command files weren't installed; copy `dw.md` / `diffwarden.md` into `.claude/commands/`, `~/.claude/commands/`, `.cursor/commands/`, or `~/.cursor/commands/`, then restart. For **Codex CLI**, `/dw` and `/diffwarden` are **not supported** — the `/` menu is built-in commands only. Install the skill to `.agents/skills/diffwarden/` (or `~/.agents/skills/diffwarden/`), restart or `/clear`, then use `$diffwarden review ...` or `/skills`. See [Codex CLI](#codex-cli) for why `/prompts:dw` also no longer works on Codex ≥ 0.117.
+**" `/dw` doesn't show in the `/` menu."** For Claude Code/Cursor, the command files weren't installed; copy `dw.md` / `diffwarden.md` into `.claude/commands/`, `~/.claude/commands/`, `.cursor/commands/`, or `~/.cursor/commands/`, then restart. For Pi Agent, install prompt templates or the Pi package extension, then run `/reload`. For **Codex CLI**, `/dw` and `/diffwarden` are **not supported** — the `/` menu is built-in commands only. Install the skill to `.agents/skills/diffwarden/` (or `~/.agents/skills/diffwarden/`), restart or `/clear`, then use `$diffwarden review ...` or `/skills`. See [Codex CLI](#codex-cli) for why `/prompts:dw` also no longer works on Codex ≥ 0.117.
 
 **"Caveman mode doesn't activate in Cursor."** Cursor has no hook system, so caveman
 needs a static rule file at `.cursor/rules/caveman.mdc` (see [Install](#install)).
@@ -781,6 +790,10 @@ git checkout -b my-change
 # 2. Make the change. Before pushing, run the same checks CI runs:
 bash -n install.sh          # shell syntax
 shellcheck install.sh       # shell lint
+node -e 'JSON.parse(require("fs").readFileSync("package.json","utf8"))'
+./install.sh --pi --pi-root /tmp/pi-agent --project --dry-run
+# Optional local Pi smoke, when pi is installed:
+pi -e ./extensions/diffwarden/index.ts --help
 # if you bumped the version, confirm it matches in every file (see below)
 
 # 3. Push to your fork and open a PR against main.
@@ -793,8 +806,9 @@ plan your PR around them:
 - **No direct pushes to `main`** — every change lands through a pull request,
   including the maintainer's. Pushing to `main` is rejected.
 - **1 approving review required** before merge.
-- **CI must pass** (`bash -n` + `shellcheck` on `install.sh`, plus a version-sync
-  check). This is enforced for everyone — the maintainer can't merge red CI.
+- **CI must pass** (`bash -n` + `shellcheck` on `install.sh`, Pi installer
+  dry-runs, Pi package static checks, plus a version-sync check). This is
+  enforced for everyone — the maintainer can't merge red CI.
 - **Squash merge only** — keeps `main` linear. Your PR's commits are squashed
   into one on merge, so a clean PR title is the commit message.
 - **No force-push, no branch deletion** on `main`.
@@ -812,6 +826,8 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 - `skills/diffwarden/SKILL.md` — the skill/playbook (the actual product).
 - `skills/diffwarden/commands/` — optional `/dw` `/diffwarden` slash files for Claude Code and Cursor.
 - `skills/diffwarden/prompts/` — Pi Agent prompt templates for `/dw` and `/diffwarden`.
+- `extensions/diffwarden/index.ts` — optional Pi extension command wrapper and resource discovery.
+- `package.json` — Pi package manifest for installing the extension from git/local paths.
 - `docs/orchestration.md` — optional model orchestration guide.
 - `install.sh` — installer that detects agents and copies the skill + command files into place.
 - `.github/workflows/ci.yml` — CI: shellchecks `install.sh` and enforces version sync.
@@ -823,4 +839,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.25.0`
+Current version: `v0.26.0`
