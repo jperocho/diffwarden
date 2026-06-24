@@ -1,9 +1,27 @@
 {
-  "name": "diffwarden",
-  "private": true,
+  "name": "pi-diffwarden",
+  "version": "0.26.1",
   "description": "Diffwarden Pi package: native /dw commands plus bundled skill discovery.",
   "license": "MIT",
-  "keywords": ["pi-package", "agent-skill", "code-review", "pull-request"],
+  "keywords": ["pi-package", "diffwarden", "agent-skill", "code-review", "pull-request"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jperocho/diffwarden.git"
+  },
+  "homepage": "https://github.com/jperocho/diffwarden",
+  "bugs": {
+    "url": "https://github.com/jperocho/diffwarden/issues"
+  },
+  "files": [
+    "extensions/",
+    "skills/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },
