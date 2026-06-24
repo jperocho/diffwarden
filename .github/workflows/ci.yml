@@ -30,6 +30,8 @@ jobs:
           check "Current version: \`v${v}\`"   README.md
           check "diffwarden/v${v}/install.sh"  README.md
           check "DEFAULT_REF=\"v${v}\""        install.sh
+          check "\"version\": \"${v}\""       package.json
+          check "npm:pi-diffwarden@${v}"        README.md
           check "## \[${v}\]"                  CHANGELOG.md
           if [ "$fail" -ne 0 ]; then
             echo "Version sync FAILED — all files must reference v${v}"
@@ -54,6 +56,9 @@ jobs:
           const fs = require("node:fs");
           const path = require("node:path");
           const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          if (pkg.name !== "pi-diffwarden") throw new Error("package name must be pi-diffwarden");
+          if (pkg.private) throw new Error("package must not be private");
+          if (!pkg.keywords?.includes("pi-package")) throw new Error("package must include pi-package keyword");
           const extensions = pkg.pi?.extensions;
           if (!Array.isArray(extensions) || extensions.length === 0) {
             throw new Error("package.json must declare pi.extensions");
@@ -71,7 +76,8 @@ jobs:
             if (!source.includes(needle)) throw new Error(`Pi extension missing ${needle}`);
           }
           NODE
-          grep -q "pi install git:github.com/jperocho/diffwarden" README.md
+          grep -q "pi install npm:pi-diffwarden" README.md
+          npm pack --dry-run
           echo "Pi package extension OK"
 
       - name: Orchestration docs
@@ -101,7 +107,7 @@ jobs:
           # every past version. The pattern matches version-shaped tokens
           # (vX.Y.Z or X.Y.Z — three dot-separated numbers); two-part tokens like
           # the TLS "1.2" in install.sh do not match.
-          files="skills/diffwarden/SKILL.md README.md install.sh skills/diffwarden/commands/dw.md skills/diffwarden/commands/diffwarden.md"
+          files="skills/diffwarden/SKILL.md README.md install.sh package.json skills/diffwarden/commands/dw.md skills/diffwarden/commands/diffwarden.md"
           # Drop matches that equal the current version; whatever is left is stale.
           orphans="$(grep -noE 'v?[0-9]+\.[0-9]+\.[0-9]+' $files \
             | grep -vE ":v?${v//./\\.}\$" || true)"

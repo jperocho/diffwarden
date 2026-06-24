@@ -4,6 +4,15 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.26.1] - 2026-06-24
+
+### Added
+
+- Added npm package metadata for publishing the Pi extension package as
+  `pi-diffwarden` with the `pi-package` keyword.
+- Added npm install instructions for Pi Agent (`pi install npm:pi-diffwarden@0.26.1`).
+- Added `npm pack --dry-run` and package-publication checks to CI.
+
 ## [0.26.0] - 2026-06-24
 
 ### Added
