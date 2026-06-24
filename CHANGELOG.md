@@ -4,6 +4,27 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.26.0] - 2026-06-24
+
+### Added
+
+- Added optional Pi package extension (`extensions/diffwarden/index.ts`) that
+  registers native `/dw` and `/diffwarden` commands, forwards to
+  `/skill:diffwarden`, provides basic argument completions, and discovers the
+  bundled skill.
+- Added `package.json` Pi package manifest so Pi can install Diffwarden from
+  git/local paths.
+- Added CI static checks for the Pi package extension manifest and wrapper.
+- Documented Pi extension install, behavior, and security warning in README and
+  `SKILL.md`.
+
+### Kept
+
+- Installer still writes only Pi skills/prompts; no extension auto-install
+  through `install.sh`.
+- Safety stance unchanged: no auto-merge, no force-push, no blind push, no
+  CI/test weakening, no resolving human comments without approval.
+
 ## [0.25.0] - 2026-06-16
 
 ### Added

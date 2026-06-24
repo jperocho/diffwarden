@@ -1,7 +1,7 @@
 ---
 name: diffwarden
-description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code and Cursor; Codex CLI uses $diffwarden or /skills."
-version: 0.25.0
+description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code, Cursor, and Pi Agent; Codex CLI uses $diffwarden or /skills."
+version: 0.26.0
 author: jperocho
 license: MIT
 metadata:
@@ -37,7 +37,7 @@ does not auto-merge, force-push, or weaken CI/tests/lint/auth/secrets.
 
 ## Caveman Mode (extra token savings)
 
-v0.25.0 defaults to **lean output** — short findings, `cN/5` loop lines, compact
+v0.26.0 defaults to **lean output** — short findings, `cN/5` loop lines, compact
 status (see Lean Output). Lean is agent-neutral, not caveman-specific.
 
 The optional `caveman` skill compresses output further (~75%) when `--verbose`
@@ -117,17 +117,20 @@ parsing fails or flags contradict each other.
 
 **Per-agent invocation:**
 
-| Agent | Supported | Not supported (and why) |
+| Agent | Supported | Notes / not supported |
 | --- | --- | --- |
 | Claude Code | `/diffwarden` (skill name); `/dw` with command files in `.claude/commands/` | — |
 | Cursor | `/diffwarden` and `/dw` with command files in `.cursor/commands/` | — |
 | Codex CLI | `$diffwarden <args>`; `/skills` picker; plain chat when this skill is loaded | `/diffwarden`, `/dw` — Codex `/` menu is built-in commands only; custom slash commands are not loaded from skill or command files ([openai/codex#11817](https://github.com/openai/codex/issues/11817)). `/prompts:dw`, `/prompts:diffwarden` — custom prompts in `~/.codex/prompts/` were removed in the **March 2026 Codex release** (0.117 series); OpenAI deprecated them in favor of skills ([custom prompts docs](https://developers.openai.com/codex/custom-prompts)). |
+| Pi Agent | `/diffwarden <args>` and `/dw <args>` via prompt templates or the optional Pi extension package; `/skill:diffwarden <args>` | Project Pi resources load only after project trust; extensions run with full local permissions. |
 
 Claude Code and Cursor: copy `skills/diffwarden/commands/*.md` to
 `.claude/commands/` or `.cursor/commands/` (or the matching global directory).
-Codex CLI: install only `SKILL.md` to `.agents/skills/diffwarden/` or
+Pi Agent: install the skill plus prompt templates, or install the Pi package for
+native extension commands that forward to `/skill:diffwarden`. Codex CLI: install
+only `SKILL.md` to `.agents/skills/diffwarden/` or
 `~/.agents/skills/diffwarden/`. Invoke with `$diffwarden review`, `$diffwarden
-fix local`, etc., or pick the skill from `/skills`. Some Claude Code builds also
+loop local`, etc., or pick the skill from `/skills`. Some Claude Code builds also
 register `/diffwarden` from the skill name without the command file.
 
 ### Grammar

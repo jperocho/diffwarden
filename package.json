@@ -1,0 +1,13 @@
+{
+  "name": "diffwarden",
+  "private": true,
+  "description": "Diffwarden Pi package: native /dw commands plus bundled skill discovery.",
+  "license": "MIT",
+  "keywords": ["pi-package", "agent-skill", "code-review", "pull-request"],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": ["./extensions/diffwarden/index.ts"]
+  }
+}
