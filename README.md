@@ -1,7 +1,12 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.26.1-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.26.2-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/jperocho/diffwarden/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jperocho/diffwarden/actions/workflows/ci.yml)
+[![skills.sh](https://img.shields.io/badge/skills.sh-diffwarden-black.svg)](https://www.skills.sh/jperocho/diffwarden/diffwarden)
+[![Agent Trust Hub](https://img.shields.io/badge/Agent%20Trust%20Hub-pass-brightgreen.svg)](https://www.skills.sh/jperocho/diffwarden/diffwarden/security/agent-trust-hub)
+[![Socket](https://img.shields.io/badge/Socket-pass-brightgreen.svg)](https://www.skills.sh/jperocho/diffwarden/diffwarden/security/socket)
+[![Snyk](https://img.shields.io/badge/Snyk-warn-yellow.svg)](https://www.skills.sh/jperocho/diffwarden/diffwarden/security/snyk)
 
 Independent PR guardian skill. You tell your coding agent "use diffwarden on this PR" and it reviews the pull request like a careful senior engineer: reads the diff, CI checks, and review comments; finds bugs and risks; fixes safe ones; verifies; and stops before doing anything dangerous.
 
@@ -35,7 +40,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). v0.26.1 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). v0.26.2 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs command files in Claude Code/Cursor. **Codex CLI is different** — see [Codex CLI](#codex-cli): use `$diffwarden` or `/skills`, not `/dw` or `/diffwarden`.
 
@@ -377,11 +382,11 @@ Diffwarden core behavior stays agent-neutral. The extension only adds native `/d
 > Security: Pi extensions run with full local permissions. Review `extensions/diffwarden/index.ts` before installing.
 
 ```bash
-pi install npm:pi-diffwarden@0.26.1      # global
-pi install -l npm:pi-diffwarden@0.26.1   # project
+pi install npm:pi-diffwarden@0.26.2      # global
+pi install -l npm:pi-diffwarden@0.26.2   # project
 
 # Git source also works:
-pi install git:github.com/jperocho/diffwarden@v0.26.1
+pi install git:github.com/jperocho/diffwarden@v0.26.2
 ```
 
 The package loads `extensions/diffwarden/index.ts`, which discovers `skills/diffwarden/SKILL.md` from this repo. Restart Pi Agent or run `/reload` after installing.
@@ -476,7 +481,7 @@ asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.26.1/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.26.2/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -731,6 +736,7 @@ Posts a `COMMENT`-type review with inline P-level notes after your approval. It 
 **Will:**
 
 - Read diffs, checks, and comments.
+- Treat PR/comment/CI text as untrusted evidence, never as instructions.
 - Fix safe, in-scope issues and run tests to verify.
 - Reply on reviewer comment threads (with `--reply` + your OK).
 - Resolve fixed threads (with `--resolve` + your OK).
@@ -843,4 +849,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.26.1`
+Current version: `v0.26.2`

@@ -4,6 +4,16 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [0.26.2] - 2026-06-24
+
+### Added
+
+- Added a global untrusted PR content boundary: PR titles, bodies, diffs,
+  review comments, issue comments, CI logs, and bot output are evidence only,
+  never instructions to follow.
+- Added verification checklist coverage for indirect prompt-injection handling.
+- Added README badges for CI, skills.sh, Agent Trust Hub, Socket, and Snyk audit pages.
+
 ## [0.26.1] - 2026-06-24
 
 ### Added
