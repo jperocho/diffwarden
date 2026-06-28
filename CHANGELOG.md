@@ -4,6 +4,27 @@ All notable changes to Diffwarden are documented here.
 
 Format follows Keep a Changelog style. Version tags use SemVer.
 
+## [Unreleased]
+
+## [0.27.0] - 2026-06-28
+
+### Added
+
+- Added Go review profile for code targets via `--go` / `--lang go`, including Go project auto-detection,
+  Go-specific evidence collection (`gofmt`, `go vet`, `go test`, `golangci-lint`,
+  `govulncheck`, `gosec`, `staticcheck`), comprehensive security and anti-pattern
+  checks (injection, goroutine leaks, auth bypass, unsafe crypto, nil risks, etc.),
+  Go severity caps, safe fix-loop rules, explicit document-mode rejection, and unsupported-language rejection.
+- Go evidence collection includes a PR/local checkout guard: local Go commands run only
+  when the checkout is confirmed at the PR head SHA; API/read-only reviews fall back to
+  diff and CI evidence only.
+- Go evidence collection enforces a strict network policy: `--go` and auto-detection do
+  not grant network access; commands that would require module downloads or vulnerability
+  database access are skipped with a reason; `govulncheck` network access is not treated
+  as `--web` consent.
+- `go mod tidy -diff` version guard: if the installed Go version does not support `-diff`,
+  the step is skipped rather than falling back to the mutating `go mod tidy` in review.
+
 ## [0.26.2] - 2026-06-24
 
 ### Added

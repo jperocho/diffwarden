@@ -9,7 +9,7 @@ The user text after this command (if any) is a Diffwarden invocation. Parse per 
 - Primary subcommands: `review` (read-only), `loop` (review-fix-verify until c5/5), `status` (score only), `comment` (short PR review comment), `help`
 - Compatibility aliases (accept, don't advertise): `fix` → `loop`; `prepare` → `loop --push`; `security` → `review --security`; `review-plan <file>` → `review <file> --as-plan`; `fix-plan <file>` → `loop <file> --as-plan`
 - Targets: `workspace` (current folder, git not required), `local` (git working tree), `staged` (git staged), PR (`#123`, URL), or file path (plan/docs/guides/tutorials)
-- Flags: `--mvp`, `--verbose`, `--orchestrate`, `--commit`, `--push`, `--as-code`, `--as-plan`, `--web` (alias `--research`), `--reply`, `--resolve`, `--delegate`, `--dry-run`, `--max N`, `--review-model`, `--fix-code-model`, `--fix-text-model`, `--security`
+- Flags: `--mvp`, `--verbose`, `--orchestrate`, `--commit`, `--push`, `--as-code`, `--as-plan`, `--web` (alias `--research`), `--reply`, `--resolve`, `--delegate`, `--dry-run`, `--max N`, `--review-model`, `--fix-code-model`, `--fix-text-model`, `--security`, `--go` (Go profile for code targets), `--lang <name>` (language profile for code targets)
 - `review`/`loop` auto-detect code vs document mode per skill **Target Auto-Detection**; `--as-code`/`--as-plan` override. `comment` is PR-only.
 - `--web` is opt-in per-finding consent; valid on `review`/`loop` (code targets); rejected on `status` and document mode.
 - `--orchestrate` enables optional reviewer/fixer role split; off by default. Model flags override config when set.

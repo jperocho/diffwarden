@@ -35,6 +35,9 @@ const completionCandidates = [
 	"--review-model",
 	"--fix-code-model",
 	"--fix-text-model",
+	"--go",
+	"--lang",
+	"go",
 ];
 
 function completeArgs(prefix: string) {
