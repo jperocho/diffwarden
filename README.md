@@ -178,13 +178,16 @@ never commits or pushes unless you pass `--commit` in a git context. `comment` i
 Diffwarden has a built-in Go/Golang review profile for code targets, activated with `--go` (or `--lang go`). Auto-detection kicks in when `go.mod`, `.go` files, or Go-related CI steps are present — no flag needed for Go projects.
 
 ```text
-/dw review workspace --go
-/dw review local --go
-/dw loop staged --go
+/dw review                 # auto-detect Go when current PR/local/workspace is Go
+/dw review workspace --go  # force Go profile on workspace scan
+/dw review local --lang go # force Go profile on uncommitted changes
+/dw loop staged --go       # fix safe Go issues in staged diff
 /dw review #123 --go --security
-/dw loop workspace --go --orchestrate
-/dw status --go
+/dw loop #123 --go --mvp
+$diffwarden review local --lang go   # Codex CLI form
 ```
+
+Use `--go` for brevity or `--lang go` for explicit language-profile syntax; they are equivalent. Valid code targets are PR refs/URLs/current branch, `local`, `staged`, `worktree`, and `workspace`.
 
 When the Go profile is active on a code target, the mode banner adds a language line:
 
@@ -217,7 +220,15 @@ auth gaps, concurrency patterns, design risks).
 the review reports `verify: skipped — command not found` and continues. Missing optional
 tools do not block the review or lower the confidence score on their own.
 
-Document reviews stay text-only: no Go auto-detection, and explicit `--go` / `--lang` on a document is rejected. Unknown `--lang` names are rejected; `go` is the only supported profile now.
+Document reviews stay text-only: no Go auto-detection, and explicit `--go` / `--lang` on a document is rejected.
+
+```text
+/dw review docs/plan.md --go       # rejected — document mode
+/dw loop README.md --lang go       # rejected — document mode
+/dw review local --lang rust       # rejected — unsupported profile
+```
+
+Unknown `--lang` names are rejected; `go` is the only supported profile now.
 
 **No network access** unless `--web` is explicitly passed and you approve each search.
 
@@ -789,12 +800,14 @@ Posts a `COMMENT`-type review with inline P-level notes after your approval. It 
 ```text
 /dw review workspace --go
 /dw review #123 --go --security
+/dw review local --lang go
 ```
 
 **Go project — fix loop on staged changes:**
 
 ```text
 /dw loop staged --go
+/dw loop #123 --go --mvp
 ```
 
 ## What it will and won't do
