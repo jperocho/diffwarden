@@ -1,6 +1,6 @@
 {
   "name": "pi-diffwarden",
-  "version": "0.26.2",
+  "version": "0.27.0",
   "description": "Diffwarden Pi package: native /dw commands plus bundled skill discovery.",
   "license": "MIT",
   "keywords": ["pi-package", "diffwarden", "agent-skill", "code-review", "pull-request"],

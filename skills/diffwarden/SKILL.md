@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code, Cursor, and Pi Agent; Codex CLI uses $diffwarden or /skills."
-version: 0.26.2
+version: 0.27.0
 author: jperocho
 license: MIT
 metadata:
@@ -37,7 +37,7 @@ does not auto-merge, force-push, or weaken CI/tests/lint/auth/secrets.
 
 ## Caveman Mode (extra token savings)
 
-v0.26.2 defaults to **lean output** — short findings, `cN/5` loop lines, compact
+v0.27.0 defaults to **lean output** — short findings, `cN/5` loop lines, compact
 status (see Lean Output). Lean is agent-neutral, not caveman-specific.
 
 The optional `caveman` skill compresses output further (~75%) when `--verbose`
@@ -100,6 +100,8 @@ Supported now:
 - `--web` (alias `--research`), optional. Web-augmented review with per-finding `[y/N]` consent (see Web-Augmented Review).
 - `--max N`, optional. Loop iterations. Default `3` (hard max `5`); workspace/document default `5`.
 - `--as-code` / `--as-plan`, optional. Force code or document mode on `review`/`loop`.
+- `--lang <name>`, optional. Enable a language review profile for code targets (`go` is currently supported). Adds profile-specific evidence collection, severity caps, and fix-loop rules.
+- `--go`, optional. Shorthand for `--lang go`. Enables the Go/Golang review profile for code targets — Go evidence collection, security checks, anti-pattern guidance, and safe fix rules. See Language Profiles.
 - Slash commands `/diffwarden` and `/dw`, optional. See Slash Commands.
 
 **Hidden back-compat aliases** (parsed, not advertised): `fix` → `loop`; `prepare` → `loop --push`; `security` → `review --security`; `review-plan` → `review <file> --as-plan`; `fix-plan` → `loop <file> --as-plan`.
@@ -151,6 +153,7 @@ $diffwarden <subcommand> [<target>] [flags]   # Codex CLI
               | --review-model | --fix-code-model | --fix-text-model
               | --as-code | --as-plan | --security | --comment | --reply | --resolve
               | --delegate | --web | --max N | --dry-run
+              | --go | --lang <name>
 ```
 
 Bare `/diffwarden`, `/dw`, or `$diffwarden` with no subcommand → `help`.
@@ -219,6 +222,18 @@ PR and git-local code targets use `code review` / `code loop`. Workspace uses
 `workspace review` / `workspace loop`. Document targets use `document review` /
 `document loop`. On override, still print the resulting line.
 
+When a language profile is active for a code target — explicit `--go` /
+`--lang go` or auto-detected — append a second line:
+
+```text
+detected: code review
+language: go
+```
+
+Print the language line only when a profile is active. Never print it in document
+mode. Omit for non-profile runs unless `--verbose` or explicit `--lang` is
+passed.
+
 ### Hidden Aliases (back-compat)
 
 `review-plan` / `fix-plan` ≡ `review` / `loop` with `--as-plan`. Not advertised.
@@ -255,6 +270,8 @@ Hidden: `fix` → `loop`; `prepare` → `loop --push`; `security` → `review --
 | `--web` | Web-augmented review (`--research` alias) |
 | `--max N` | `--max-iterations N` |
 | `--dry-run` | No edits/commits/push/post |
+| `--go` | Go review profile for code targets (shorthand for `--lang go`) |
+| `--lang <name>` | Language profile for code targets; `go` supported |
 
 Default iterations: `3` (hard max `5`). **Workspace/document:** default `5`.
 
@@ -331,9 +348,11 @@ Reject with one-line reason; suggest correct command:
 | `* --max N` where N > 5 | Hard cap | `--max 5` |
 | `--as-code` and `--as-plan` | Mutually exclusive | pick one |
 | `--as-plan` on PR/local/staged/workspace | Not a document | drop flag or pass document path |
+| `--lang <name>` where name is not `go` | Unsupported language profile | `--lang go` or drop flag |
 | `security … --delegate` | Security reads raw | `review --security` |
 | `status … --web` | Snapshot only | `review … --web` |
 | `--web` on document `--as-plan` | Document grounds locally | drop `--web` |
+| `--go` / `--lang` on document target or `--as-plan` | Language profiles are code-only | drop language flag or pass code target |
 | `prepare` on document | Code-only alias | `loop <doc>` |
 | `loop workspace --commit` | Workspace never commits | `loop workspace` |
 
@@ -362,6 +381,7 @@ Targets:
 Flags:
   --mvp             stop at c4/5
   --security        security-focused review
+  --go              Go review profile for code targets
   --orchestrate     use reviewer/fixer role split if supported
   --verbose         full report
   --commit          commit verified changes
@@ -369,8 +389,8 @@ Flags:
 
 Use `/dw help --verbose` for advanced/back-compatible flags:
 `--as-code`, `--as-plan`, `--web`, `--research`, `--reply`, `--resolve`,
-`--delegate`, `--dry-run`, `--max N`, `--review-model`, `--fix-code-model`,
-and `--fix-text-model`.
+`--delegate`, `--dry-run`, `--max N`, `--lang <name>`, `--review-model`,
+`--fix-code-model`, and `--fix-text-model`.
 
 Hidden aliases (parsed, not shown): fix→loop, prepare→loop --push,
 security→review --security, review-plan/fix-plan.
@@ -1028,6 +1048,262 @@ Mode read-only rules above. Former "plan-readiness" score = document score.
 `loop` on a plan/document with `--as-plan` uses Document Review Mode loop rules.
 Former Plan Fix Mode behavior is unchanged: backup `.orig`, edit document only,
 default `--max-iterations 5`, no code/git/commit/push.
+
+## Language Profiles
+
+Language profiles augment code review with language-specific evidence collection,
+severity caps, security checks, and fix-loop rules. Profiles compose with code
+subcommands and targets only: PR, git-local, and workspace. Document mode stays
+text-only and never runs language evidence commands.
+
+### Selecting a profile
+
+Explicit (highest priority):
+
+- `--go` — Go/Golang profile, shorthand for `--lang go`
+- `--lang go` — same
+
+Unknown language names are rejected; `go` is the only supported profile now.
+
+After mode selection, code targets may select a language profile. Document mode
+never auto-detects a language profile; explicit `--go` / `--lang` on a document
+is rejected.
+
+When no explicit flag is passed on a code target, Diffwarden auto-detects the
+language from high-confidence signals (see Go Auto-Detection). Explicit `--lang`
+always wins.
+
+### Go Auto-Detection
+
+For code targets only, detect a Go project or Go changes using high-confidence
+signals (first match wins):
+
+1. `go.mod` present in changed files or workspace root.
+2. `go.sum` present in changed files or workspace root.
+3. `.go` files appear in the git diff or workspace scan.
+4. `cmd/`, `internal/`, or `pkg/` directories contain `.go` files.
+5. CI/workflow files reference `go test`, `golangci-lint`, `govulncheck`, `gosec`,
+   or `staticcheck`.
+
+Check changed files first, then workspace root, then CI files. If signals are
+ambiguous (e.g. multi-language mono-repo), prefer explicit `--lang` and print no
+auto-detected language line.
+
+### Go Review Profile
+
+When the Go profile is active — explicitly or auto-detected — extend the standard
+review with all of the following areas:
+
+**Go idioms and standards**
+
+- `gofmt` formatting issues
+- `go vet` issues (printf format mismatches, unreachable code, struct tag problems)
+- Non-idiomatic patterns (naked returns in long functions, empty interface overuse,
+  pointer receivers on value-safe types)
+- Unnecessary global state, excessive package coupling, large functions, poor package
+  boundaries
+
+**Error handling**
+
+- Ignored errors (unchecked return values)
+- Wrapped errors and sentinel error misuse (`errors.Is`/`errors.As` vs direct compare)
+- Error strings beginning with uppercase or ending in punctuation
+- Multiple error types where a single typed error fits better
+
+**Nil pointer and interface safety**
+
+- Nil pointer dereference risks
+- Typed-nil vs untyped-nil interface traps
+- Unnecessary interface explosion or fat interfaces
+
+**Concurrency and goroutines**
+
+- Shared mutable state with no mutex or channel synchronization
+- Context propagation and cancellation (missing context plumbing, ignoring `context.Done`)
+- Goroutine leaks (goroutines that cannot exit, channels never closed)
+- Channel misuse (blocking unbuffered sends, send on closed channel, receive after close)
+- Data races detectable by `go test -race`
+
+**Resource management**
+
+- Missing `defer rows.Close()`, `resp.Body.Close()`, or equivalent cleanup
+- File handles not closed on error paths
+- HTTP response bodies not drained before close
+
+**Dependencies and modules**
+
+- Dependency risks in `go.mod` and `go.sum`
+- Vulnerable dependencies (detectable by `govulncheck`)
+- Inconsistent or missing `go.sum` entries
+
+**Security**
+
+- Hardcoded secrets, tokens, or credentials
+- Path traversal via user-controlled file paths
+- Command injection via `os/exec` with unsanitized input
+- SQL injection (string-formatted queries, `fmt.Sprintf` in SQL paths)
+- SSRF via user-controlled URLs passed to HTTP clients
+- Insecure crypto (MD5/SHA1 for security purposes, `math/rand` instead of
+  `crypto/rand` for secrets or tokens)
+- Weak randomness (`math/rand` seeded predictably or unseeded)
+- Unsafe file permissions (world-writable paths, `os.Create` without explicit mode)
+- Unsafe `os/exec` usage (shell injection via user input)
+- Unsafe deserialization/parsing (`encoding/gob`, `encoding/json` with `interface{}`
+  and attacker-supplied input)
+- HTTP server timeout misconfiguration (missing `ReadTimeout`, `WriteTimeout`,
+  `IdleTimeout`)
+- Missing request size limits (`http.MaxBytesReader` absent on large-body paths)
+- Missing authz/ownership checks in handlers and services
+- Logging sensitive data (tokens, passwords, PII in log calls)
+
+**Tests**
+
+- Missing tests for changed critical Go logic
+- Test helpers not using `t.Helper()`
+- Table-driven test opportunities (repeated similar test blocks)
+
+### Go Evidence Collection
+
+When the Go profile is active on a code target, run available local commands in
+this safe order:
+
+```bash
+go version               # confirm Go installed; anchor for all other commands
+go env GOPATH GOMOD      # confirm module mode and go.mod location
+go mod tidy -diff        # show what go mod tidy would change (read-only in review)
+gofmt -l .               # list files that do not match gofmt (read-only)
+go vet ./...             # static analysis (read-only)
+go test ./...            # run tests
+go test -race ./...      # race detector (see rules below)
+golangci-lint run ./...  # optional: lint aggregator
+govulncheck ./...        # optional: vulnerability scanner
+gosec ./...              # optional: security linter
+staticcheck ./...        # optional: staticcheck
+```
+
+Rules:
+
+- `go`, `gofmt`, `go vet`, `go test` are **core** when Go is installed (`command -v go`).
+- `golangci-lint`, `govulncheck`, `gosec`, `staticcheck` are **optional high-signal**.
+  If missing, report `verify: skipped — command not found`. Do not fail the review.
+- Never run destructive commands.
+- In `review`: `go mod tidy -diff` is read-only; do not write `go.mod`/`go.sum`. If
+  the installed Go version does not support `-diff`, skip it entirely — do not fall
+  back to the mutating `go mod tidy`.
+- In `loop`: apply `go mod tidy` changes only when module files are in scope and the
+  change is deterministic and safe.
+- `go test -race` is expensive. Run it only when:
+  - `--security` is active, **or**
+  - the diff touches concurrency-sensitive code (goroutines, channels, mutexes,
+    sync primitives), **or**
+  - `--verbose` or a deep review was requested.
+  - Otherwise: `verify: recommended — go test -race ./... (skipped; enable with --security or --verbose)`.
+
+**PR/local checkout guard:**
+
+- In explicit PR mode, run local Go commands only after the existing Diffwarden PR gate
+  confirms the local checkout is at the PR head SHA.
+- If the review is API/read-only (no local checkout) or the local checkout is not at the
+  PR head, do not checkout, fetch, switch branches, or run local Go commands implicitly.
+  Report `verify: skipped — local checkout not at PR head` and base Go findings on the PR
+  diff and CI evidence only.
+
+**Network policy:**
+
+- `--go` and Go auto-detection do not grant network access.
+- Do not trigger module downloads, vulnerability database updates, or other external
+  network calls during Go evidence collection.
+- Run Go commands only when they can complete from the local workspace and module cache,
+  or with offline/no-proxy settings. If offline execution cannot be confirmed, report
+  `verify: skipped — network access would be required`.
+- `govulncheck` is optional and may require vulnerability database access. Run it only
+  when installed **and** the database is already available locally/offline; otherwise skip
+  with reason. `govulncheck` network access is not `--web` consent and does not bypass
+  the per-finding `[y/N]` gate.
+
+Verbose verification output includes discovered commands and skipped tools:
+
+```text
+Verification:
+- go test ./...: pass
+- go vet ./...: pass
+- gofmt -l .: pass (no files)
+- golangci-lint run ./...: skipped — command not found
+- govulncheck ./...: skipped — command not found
+- gosec ./...: pass
+```
+
+### Go Severity Caps
+
+Use the standard confidence scale with these Go-specific caps:
+
+| Condition | Maximum level |
+|-----------|---------------|
+| Security vuln, exploitable injection, auth bypass, data loss, or reachable vulnerable dep | `c1/5` |
+| Failing `go test`, `go vet`, or build failure | `c2/5` |
+| Missing tests for changed critical Go logic | `c3/5` |
+| Optional tool missing; core checks passing | no cap |
+| Formatting-only issue | P3 unless CI fails on it |
+| Tool output unrelated to changed code | informational only |
+
+Every actionable Go finding still requires: `file:line` or command anchor, exact
+quoted evidence or command output snippet, why it matters, concrete fix, and a
+verification command.
+
+### Go Fix-Loop Rules
+
+For `/dw loop ... --go`, apply these in addition to standard safe-fix rules:
+
+**Safe to fix automatically:**
+
+- Run `gofmt` on touched Go files (format-only, no behavior change)
+- Fix obvious `go vet` issues
+- Fix ignored errors when local behavior is unambiguous
+- Add missing `defer rows.Close()` / `resp.Body.Close()` when evidence is clear
+- Add context propagation when the call chain is short and local
+- Add targeted tests for changed behavior
+- Fix a failing linter issue when the fix is one or two lines and purely local
+- Update `go.mod` / `go.sum` only when required by a safe dependency change or a
+  confirmed `go mod tidy` result
+
+**Ask first (do not auto-fix):**
+
+- Broad package restructure
+- Public API changes (exported function signatures, interface additions/removals)
+- Dependency major version upgrades
+- Auth or business-rule changes
+- Database migrations
+- Concurrency rewrites
+- Changing crypto or auth behavior
+- Adding `//nolint` directives without evidence
+- Weakening timeouts, validation, auth, or permission checks
+
+### Go output examples
+
+Lean output (default):
+
+```text
+detected: code review
+language: go
+
+Findings:
+- P1 internal/api/user.go:88 — handler trusts user_id from request body instead of auth context
+- P2 internal/store/orders.go:121 — rows.Close missing on query path
+
+Status: not-ready
+Level: 2/5
+```
+
+Verbose verification block:
+
+```text
+Verification:
+- go test ./...: pass
+- go vet ./...: pass
+- golangci-lint run ./...: skipped — command not found
+- govulncheck ./...: skipped — command not found
+- gosec ./...: pass
+```
 
 ## Evidence Collection
 
@@ -2438,3 +2714,4 @@ Before final answer:
 - [ ] If `--web`: per-finding `[y/N]`; redacted descriptor only; `web-verified` vs `local-only`.
 - [ ] If `--delegate`: coverage enumerated raw; claims grounded; security files raw.
 - [ ] If code changed and `--verbose`: How to test grounded; omitted in lean default.
+- [ ] If `--go` or `--lang go` (explicit or auto-detected): mode banner includes `language: go` second line; Go evidence commands run in safe order; optional tools skipped gracefully; Go severity caps applied; Go fix-loop safe/unsafe split honored; PR/local checkout guard enforced; network policy enforced (no module downloads or vuln DB access without offline confirmation; `govulncheck` network ≠ `--web` consent).
