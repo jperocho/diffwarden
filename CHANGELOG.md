@@ -6,6 +6,12 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-06-28
+
+### Changed
+
+- Documented Go language-profile usage examples for `--go` and `--lang go`, including valid code targets, Codex CLI form, and rejected document/unsupported-language cases.
+
 ## [0.27.0] - 2026-06-28
 
 ### Added

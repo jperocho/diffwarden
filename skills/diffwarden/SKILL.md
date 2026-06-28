@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code, Cursor, and Pi Agent; Codex CLI uses $diffwarden or /skills."
-version: 0.27.0
+version: 0.27.1
 author: jperocho
 license: MIT
 metadata:
@@ -37,7 +37,7 @@ does not auto-merge, force-push, or weaken CI/tests/lint/auth/secrets.
 
 ## Caveman Mode (extra token savings)
 
-v0.27.0 defaults to **lean output** — short findings, `cN/5` loop lines, compact
+v0.27.1 defaults to **lean output** — short findings, `cN/5` loop lines, compact
 status (see Lean Output). Lean is agent-neutral, not caveman-specific.
 
 The optional `caveman` skill compresses output further (~75%) when `--verbose`
@@ -1073,6 +1073,29 @@ When no explicit flag is passed on a code target, Diffwarden auto-detects the
 language from high-confidence signals (see Go Auto-Detection). Explicit `--lang`
 always wins.
 
+### Go usage quick reference
+
+Use either `--go` (short) or `--lang go` (explicit). They are equivalent.
+Auto-detection means Go projects often need no flag.
+
+```text
+/dw review                 # auto-detect Go when current PR/local/workspace is Go
+/dw review workspace --go  # force Go profile on workspace scan
+/dw review local --lang go # force Go profile on uncommitted changes
+/dw loop staged --go       # fix safe Go issues in staged diff
+/dw review #123 --go --security
+/dw loop #123 --go --mvp
+$diffwarden review local --lang go   # Codex CLI form
+```
+
+Valid code targets: PR refs/URLs/current branch, `local`, `staged`, `worktree`,
+and `workspace`. Invalid document targets:
+
+```text
+/dw review docs/plan.md --go       # rejected — document mode
+/dw review docs/plan.md --lang go  # rejected — document mode
+```
+
 ### Go Auto-Detection
 
 For code targets only, detect a Go project or Go changes using high-confidence
@@ -1277,6 +1300,14 @@ For `/dw loop ... --go`, apply these in addition to standard safe-fix rules:
 - Changing crypto or auth behavior
 - Adding `//nolint` directives without evidence
 - Weakening timeouts, validation, auth, or permission checks
+
+### Go invalid examples
+
+```text
+/dw review docs/design.md --go       # blocked — language profiles are code-only
+/dw loop README.md --lang go         # blocked — document loop stays text-only
+/dw review local --lang rust         # blocked — unsupported language profile
+```
 
 ### Go output examples
 

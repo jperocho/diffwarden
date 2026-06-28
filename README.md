@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.27.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.27.1-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/jperocho/diffwarden/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jperocho/diffwarden/actions/workflows/ci.yml)
 [![skills.sh](https://img.shields.io/badge/skills.sh-diffwarden-black.svg)](https://www.skills.sh/jperocho/diffwarden/diffwarden)
@@ -41,7 +41,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). v0.27.0 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). v0.27.1 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs command files in Claude Code/Cursor. **Codex CLI is different** — see [Codex CLI](#codex-cli): use `$diffwarden` or `/skills`, not `/dw` or `/diffwarden`.
 
@@ -178,13 +178,16 @@ never commits or pushes unless you pass `--commit` in a git context. `comment` i
 Diffwarden has a built-in Go/Golang review profile for code targets, activated with `--go` (or `--lang go`). Auto-detection kicks in when `go.mod`, `.go` files, or Go-related CI steps are present — no flag needed for Go projects.
 
 ```text
-/dw review workspace --go
-/dw review local --go
-/dw loop staged --go
+/dw review                 # auto-detect Go when current PR/local/workspace is Go
+/dw review workspace --go  # force Go profile on workspace scan
+/dw review local --lang go # force Go profile on uncommitted changes
+/dw loop staged --go       # fix safe Go issues in staged diff
 /dw review #123 --go --security
-/dw loop workspace --go --orchestrate
-/dw status --go
+/dw loop #123 --go --mvp
+$diffwarden review local --lang go   # Codex CLI form
 ```
+
+Use `--go` for brevity or `--lang go` for explicit language-profile syntax; they are equivalent. Valid code targets are PR refs/URLs/current branch, `local`, `staged`, `worktree`, and `workspace`.
 
 When the Go profile is active on a code target, the mode banner adds a language line:
 
@@ -217,7 +220,15 @@ auth gaps, concurrency patterns, design risks).
 the review reports `verify: skipped — command not found` and continues. Missing optional
 tools do not block the review or lower the confidence score on their own.
 
-Document reviews stay text-only: no Go auto-detection, and explicit `--go` / `--lang` on a document is rejected. Unknown `--lang` names are rejected; `go` is the only supported profile now.
+Document reviews stay text-only: no Go auto-detection, and explicit `--go` / `--lang` on a document is rejected.
+
+```text
+/dw review docs/plan.md --go       # rejected — document mode
+/dw loop README.md --lang go       # rejected — document mode
+/dw review local --lang rust       # rejected — unsupported profile
+```
+
+Unknown `--lang` names are rejected; `go` is the only supported profile now.
 
 **No network access** unless `--web` is explicitly passed and you approve each search.
 
@@ -435,11 +446,11 @@ Diffwarden core behavior stays agent-neutral. The extension only adds native `/d
 > Security: Pi extensions run with full local permissions. Review `extensions/diffwarden/index.ts` before installing.
 
 ```bash
-pi install npm:pi-diffwarden@0.27.0      # global
-pi install -l npm:pi-diffwarden@0.27.0   # project
+pi install npm:pi-diffwarden@0.27.1      # global
+pi install -l npm:pi-diffwarden@0.27.1   # project
 
 # Git source also works:
-pi install git:github.com/jperocho/diffwarden@v0.27.0
+pi install git:github.com/jperocho/diffwarden@v0.27.1
 ```
 
 The package loads `extensions/diffwarden/index.ts`, which discovers `skills/diffwarden/SKILL.md` from this repo. Restart Pi Agent or run `/reload` after installing.
@@ -534,7 +545,7 @@ asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.27.0/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.27.1/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -789,12 +800,14 @@ Posts a `COMMENT`-type review with inline P-level notes after your approval. It 
 ```text
 /dw review workspace --go
 /dw review #123 --go --security
+/dw review local --lang go
 ```
 
 **Go project — fix loop on staged changes:**
 
 ```text
 /dw loop staged --go
+/dw loop #123 --go --mvp
 ```
 
 ## What it will and won't do
@@ -915,4 +928,4 @@ duplicated across six places and must stay in sync (CI fails otherwise) — see
 
 ## Version
 
-Current version: `v0.27.0`
+Current version: `v0.27.1`

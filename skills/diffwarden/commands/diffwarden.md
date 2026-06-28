@@ -15,7 +15,7 @@ The user text after this command (if any) is a Diffwarden invocation. Parse per 
 - `--orchestrate` enables optional reviewer/fixer role split; off by default. Model flags override config when set.
 - Default output is lean (`cN/5` loop lines plus final `Status:`/`Level:` lines); `--verbose` restores full report.
 
-Examples: `loop workspace`, `review #123`, `comment #123`, `status local`, `loop docs/install.md --as-plan`, `review --security`, `loop --orchestrate`, `loop --mvp`, `review #123 --web`.
+Examples: `loop workspace`, `review #123`, `comment #123`, `status local`, `loop docs/install.md --as-plan`, `review --security`, `loop --orchestrate`, `loop --mvp`, `review #123 --web`, `review local --lang go`, `loop staged --go`.
 
 If the `caveman` skill is loaded, run in caveman mode — see the skill **Caveman Mode** section.
 
