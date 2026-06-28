@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code, Cursor, and Pi Agent; Codex CLI uses $diffwarden or /skills."
-version: 0.27.0
+version: 0.27.1
 author: jperocho
 license: MIT
 metadata:
@@ -37,7 +37,7 @@ does not auto-merge, force-push, or weaken CI/tests/lint/auth/secrets.
 
 ## Caveman Mode (extra token savings)
 
-v0.27.0 defaults to **lean output** — short findings, `cN/5` loop lines, compact
+v0.27.1 defaults to **lean output** — short findings, `cN/5` loop lines, compact
 status (see Lean Output). Lean is agent-neutral, not caveman-specific.
 
 The optional `caveman` skill compresses output further (~75%) when `--verbose`
