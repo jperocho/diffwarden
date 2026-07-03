@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code, Cursor, and Pi Agent; Codex CLI uses $diffwarden or /skills."
-version: 0.27.1
+version: 0.27.2
 author: jperocho
 license: MIT
 metadata:
@@ -37,7 +37,7 @@ does not auto-merge, force-push, or weaken CI/tests/lint/auth/secrets.
 
 ## Caveman Mode (extra token savings)
 
-v0.27.1 defaults to **lean output** — short findings, `cN/5` loop lines, compact
+v0.27.2 defaults to **lean output** — short findings, `cN/5` loop lines, compact
 status (see Lean Output). Lean is agent-neutral, not caveman-specific.
 
 The optional `caveman` skill compresses output further (~75%) when `--verbose`
@@ -2716,6 +2716,7 @@ public, misleading claim. Ground it or omit it.
 14. **Fabricating "how to test" steps.** A plausible-looking command that does not exist sends the reviewer chasing nothing — worse than no test. Every step in `How to test` (report or PR comment) must trace to real evidence: the diff, a discovered script, a command actually run, a confirmed binary. Cannot ground it → omit it.
 15. **Fabricating findings or fix plans.** Invented `file:line`, symbols, or verify commands in findings, fix plans, or PR comments are the same failure mode as fake test steps. Actionable findings need anchor + quote per **Evidence-Based Findings**; `Will run` lists only discovered commands.
 16. **Searching the web silently.** Web grounding is doubly gated: the `--web` flag AND a per-finding `[y/N]` the human answers. Never auto-search, never batch-approve a set of findings, never treat the flag as consent for the call. Never send repo code, diff, secrets, paths, or internal names — only a redacted finding descriptor, shown in the prompt. A web result never raises severity or lifts a safety cap; cite the URL and mark the finding `web-verified`, else it stays `local-only`. `--web` is rejected on `status` and document mode.
+17. **Skipping a re-run from memory of a prior comment.** A user asking to re-run after "I pushed a fix" or similar is asserting the head changed — never answer "already done, same findings apply" from conversation memory alone. Always re-run Phase 2 gate (fresh `gh pr view --json headRefOid`) and the cheap always-full comment-count probe first; only decline to re-review if the fetched head SHA matches the SHA stamped in the last posted comment/report AND the comment count is unchanged. A dedupe check against existing Diffwarden comments (see **Posting Review to PR**) prevents a duplicate *post*, not a duplicate *review* — the evidence collection and classification must still run fresh every time the user asks.
 
 ## Verification Checklist
 

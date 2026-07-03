@@ -6,6 +6,12 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 
 ## [Unreleased]
 
+## [0.27.2] - 2026-07-03
+
+### Fixed
+
+- Added a Common Pitfalls rule against declining a re-run from conversation memory of a prior posted comment ("already done, same findings apply"). Re-run requests now always re-fetch the current PR head SHA and comment count before deciding a review is a duplicate.
+
 ## [0.27.1] - 2026-06-28
 
 ### Changed
