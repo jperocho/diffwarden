@@ -2229,7 +2229,7 @@ Hard rules:
 ```text
 Findings: One blocking auth issue remains; tests are missing for the changed branch.
 Status: not-ready
-Level: 2/5
+Level: 2/5 @ <head-sha>
 ```
 
 Ready example:
@@ -2237,8 +2237,13 @@ Ready example:
 ```text
 Findings: No blocking issues found.
 Status: ready
-Level: 5/5
+Level: 5/5 @ <head-sha>
 ```
+
+Always stamp the head SHA on the `Level:` line of a posted comment. A later run
+(even a fresh session with no memory) compares its fetched head SHA against the
+stamped one to decide whether a re-review is a genuine duplicate — see **Common
+Pitfalls** #17.
 
 **Inline P comments** (anchored to changed lines when possible):
 
@@ -2565,7 +2570,7 @@ Level: N/5 @ <head-sha> (checks: passing | pending | failing | n/a)
 ```text
 Findings: <short general summary>
 Status: ready | not-ready
-Level: N/5
+Level: N/5 @ <head-sha>
 ```
 
 **Inline P comments** on changed lines when possible:

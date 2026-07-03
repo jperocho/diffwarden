@@ -11,6 +11,7 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 ### Fixed
 
 - Added a Common Pitfalls rule against declining a re-run from conversation memory of a prior posted comment ("already done, same findings apply"). Re-run requests now always re-fetch the current PR head SHA and comment count before deciding a review is a duplicate.
+- Posted PR comment summaries now stamp the head SHA on the `Level:` line, so a later run (including a fresh session) can compare head SHAs to detect a genuine duplicate instead of relying on memory.
 
 ## [0.27.1] - 2026-06-28
 
