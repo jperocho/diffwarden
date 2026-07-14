@@ -1,6 +1,6 @@
 # Diffwarden
 
-[![version](https://img.shields.io/badge/version-0.27.2-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.28.0-blue.svg)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/jperocho/diffwarden/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jperocho/diffwarden/actions/workflows/ci.yml)
 [![skills.sh](https://img.shields.io/badge/skills.sh-diffwarden-black.svg)](https://www.skills.sh/jperocho/diffwarden/diffwarden)
@@ -41,7 +41,7 @@ It never auto-merges, never force-pushes, and never weakens your tests or CI to 
 
 ## Command reference
 
-Invoke with `/diffwarden` (or the optional `/dw` alias). v0.27.2 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
+Invoke with `/diffwarden` (or the optional `/dw` alias). v0.28.0 uses five primary commands: `review`, `loop`, `status`, `comment`, and `help`. Target arg: `workspace` (current folder, git not required), a local target (`local`, `staged`), a PR (`#123`, full URL, or omit for current-branch PR), or a plan/docs file (`path/to/file.md`). Natural-language prompts still work — see [Slash commands](#slash-commands).
 
 **What works out of the box:** once the skill is installed (see [Install](#install)), `/diffwarden` registers in **Claude Code** automatically (it matches the skill name). The shorthand `/dw` needs command files in Claude Code/Cursor. **Codex CLI is different** — see [Codex CLI](#codex-cli): use `$diffwarden` or `/skills`, not `/dw` or `/diffwarden`.
 
@@ -312,6 +312,8 @@ Level: 2/5
 
 Use `--verbose` for the full report (iterations, verification, changed files, risks, next action, how to test).
 
+v0.28.0 also compacts the installed skill itself. The core playbook keeps optional details gated by mode/flag, so normal invocations spend fewer input tokens before evidence collection.
+
 ### Commands
 
 | Goal | Command |
@@ -325,7 +327,7 @@ Use `--verbose` for the full report (iterations, verification, changed files, ri
 
 Natural language: `Use diffwarden on the current PR --max-iterations 5`
 
-Default **3** iterations; hard max **5** unless you explicitly ask for more in chat.
+Default **3** iterations; hard max **5**.
 
 ### What c5/5 means
 
@@ -446,11 +448,11 @@ Diffwarden core behavior stays agent-neutral. The extension only adds native `/d
 > Security: Pi extensions run with full local permissions. Review `extensions/diffwarden/index.ts` before installing.
 
 ```bash
-pi install npm:pi-diffwarden@0.27.2      # global
-pi install -l npm:pi-diffwarden@0.27.2   # project
+pi install npm:pi-diffwarden@0.28.0      # global
+pi install -l npm:pi-diffwarden@0.28.0   # project
 
 # Git source also works:
-pi install git:github.com/jperocho/diffwarden@v0.27.2
+pi install git:github.com/jperocho/diffwarden@v0.28.0
 ```
 
 The package loads `extensions/diffwarden/index.ts`, which discovers `skills/diffwarden/SKILL.md` from this repo. Restart Pi Agent or run `/reload` after installing.
@@ -545,7 +547,7 @@ asking.
 
 ```bash
 # Recommended: download → read → run
-curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.27.2/install.sh
+curl -fsSLO https://raw.githubusercontent.com/jperocho/diffwarden/v0.28.0/install.sh
 less install.sh        # read it first
 bash install.sh        # interactive: detects agents, asks scope, confirms
 
@@ -928,4 +930,4 @@ duplicated across eight places and must stay in sync (CI fails otherwise) — se
 
 ## Version
 
-Current version: `v0.27.2`
+Current version: `v0.28.0`

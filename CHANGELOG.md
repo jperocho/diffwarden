@@ -6,6 +6,14 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-07-14
+
+### Changed
+
+- Compacted `SKILL.md` into a shorter core playbook to reduce baseline input-token use on every Diffwarden invocation.
+- Added explicit token-discipline rules for filtering generated/noisy evidence, gating optional sections by flag/mode, and keeping lean output as default.
+- Preserved safety gates, mode support, Go profile, web gating, delegated reads, posting/reply rules, and hallucination guard in condensed form.
+
 ## [0.27.2] - 2026-07-03
 
 ### Fixed
