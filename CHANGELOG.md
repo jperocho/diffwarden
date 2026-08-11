@@ -6,6 +6,14 @@ Format follows Keep a Changelog style. Version tags use SemVer.
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-08-11
+
+### Fixed
+
+- Hardened final `Status:`/`Level:` output contract in `SKILL.md`, prompts, and command files to explicitly survive Pi/master/orchestration wrapper contexts.
+- Updated `docs/orchestration.md` output example to include `Status: ready` and `Level: 5/5`; added note that orchestrators/master reviewers must append these as the last two lines.
+- Added CI static check to verify `Status:` and `Level:` appear in `SKILL.md`, both prompts, both command files, and `docs/orchestration.md`.
+
 ## [0.28.0] - 2026-07-14
 
 ### Changed

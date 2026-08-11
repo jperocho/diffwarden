@@ -80,6 +80,48 @@ jobs:
           npm pack --dry-run
           echo "Pi package extension OK"
 
+      - name: Final-line contract (Status/Level in all skill files)
+        run: |
+          set -euo pipefail
+          fail=0
+          # 1. Each required file must contain both Status: and Level: lines.
+          for f in \
+            skills/diffwarden/SKILL.md \
+            skills/diffwarden/prompts/dw.md \
+            skills/diffwarden/prompts/diffwarden.md \
+            skills/diffwarden/commands/dw.md \
+            skills/diffwarden/commands/diffwarden.md \
+            docs/orchestration.md; do
+            grep -q 'Status:' "$f" || { echo "MISSING Status: in $f"; fail=1; }
+            grep -q 'Level:'  "$f" || { echo "MISSING Level: in $f";  fail=1; }
+          done
+          # 2. SKILL.md must NOT contain `Level: N/5 @` or `Level: <N>/5 @` —
+          #    the final Level: line must be plain (no SHA/check suffix).
+          if grep -qE 'Level: .*/5 @' skills/diffwarden/SKILL.md; then
+            echo "REGRESSION: SKILL.md contains 'Level: .../5 @' — SHA metadata must move to a Head: line before Status:/Level:"
+            grep -nE 'Level: .*/5 @' skills/diffwarden/SKILL.md
+            fail=1
+          fi
+          # 3. SKILL.md must have Status: immediately before Level: in the canonical contract block.
+          python3 - <<'PYEOF'
+import sys
+lines = open("skills/diffwarden/SKILL.md").readlines()
+# Verify the canonical two-line contract appears: a 'Status:' line directly followed by 'Level:'
+found = False
+for i in range(len(lines) - 1):
+    s = lines[i].strip()
+    l = lines[i+1].strip()
+    if s.startswith("Status:") and l.startswith("Level:") and "@" not in l:
+        found = True
+        break
+if not found:
+    print("FAIL: SKILL.md has no adjacent Status:/Level: pair where Level: is plain (no @ suffix)")
+    sys.exit(1)
+print("Contract order check OK")
+PYEOF
+          [ "$fail" -eq 0 ] || exit 1
+          echo "Final-line contract OK"
+
       - name: Orchestration docs
         run: |
           test -f docs/orchestration.md
