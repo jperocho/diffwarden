@@ -80,6 +80,67 @@ jobs:
           npm pack --dry-run
           echo "Pi package extension OK"
 
+      - name: Final-line contract (Status/Level in all skill files)
+        run: |
+          set -euo pipefail
+          fail=0
+
+          # SKILL.md: exact adjacent canonical contract block (no head -1 heuristic)
+          awk '
+            index($0,"Status: ready | not-ready"){s=1;next}
+            s && $0=="Level: N/5"{found=1;exit}
+            {s=0}
+            END{if(!found){print "FAIL: SKILL.md missing exact Status:.../Level:N/5 adjacent block";exit 1}
+                print "SKILL.md contract block OK"}
+          ' skills/diffwarden/SKILL.md || fail=1
+
+          # SKILL.md: no Level: .../5 @ suffix (SHA must be on Head: line, not Level: suffix)
+          if grep -qE 'Level: .*/5 @' skills/diffwarden/SKILL.md; then
+            echo "REGRESSION: SKILL.md contains 'Level: .../5 @'"
+            grep -nE 'Level: .*/5 @' skills/diffwarden/SKILL.md
+            fail=1
+          fi
+
+          # prompts: exact required contract phrases (no head -1)
+          for f in skills/diffwarden/prompts/dw.md skills/diffwarden/prompts/diffwarden.md; do
+            grep -qF 'end with exactly two lines' "$f" \
+              || { echo "MISSING 'end with exactly two lines' in $f"; fail=1; }
+            grep -qF 'Status: ready | not-ready | blocked | user decision needed' "$f" \
+              || { echo "MISSING Status contract phrase in $f"; fail=1; }
+            grep -qF 'Level: N/5' "$f" \
+              || { echo "MISSING 'Level: N/5' in $f"; fail=1; }
+            grep -qF 'wrappers do not replace' "$f" \
+              || { echo "MISSING wrapper clause in $f"; fail=1; }
+          done
+
+          # commands: contract phrases required (no head -1)
+          for f in skills/diffwarden/commands/dw.md skills/diffwarden/commands/diffwarden.md; do
+            grep -qF 'Final-line contract' "$f" \
+              || { echo "MISSING 'Final-line contract' in $f"; fail=1; }
+            grep -qF 'last two output lines' "$f" \
+              || { echo "MISSING 'last two output lines' in $f"; fail=1; }
+            grep -q 'Status:' "$f" \
+              || { echo "MISSING 'Status:' in $f"; fail=1; }
+            grep -q 'Level:' "$f" \
+              || { echo "MISSING 'Level:' in $f"; fail=1; }
+            grep -qF 'wrappers do not replace' "$f" \
+              || { echo "MISSING 'wrappers do not replace' in $f"; fail=1; }
+          done
+
+          # orchestration.md: exact adjacent Status: ready / Level: 5/5 + append sentence
+          awk '
+            $0=="Status: ready"{s=1;next}
+            s && $0=="Level: 5/5"{found=1;exit}
+            {s=0}
+            END{if(!found){print "FAIL: docs/orchestration.md missing Status:ready/Level:5/5 adjacent block";exit 1}
+                print "orchestration.md contract block OK"}
+          ' docs/orchestration.md || fail=1
+          grep -qF 'append' docs/orchestration.md \
+            || { echo "MISSING append sentence in docs/orchestration.md"; fail=1; }
+
+          [ "$fail" -eq 0 ] || exit 1
+          echo "Final-line contract OK"
+
       - name: Orchestration docs
         run: |
           test -f docs/orchestration.md

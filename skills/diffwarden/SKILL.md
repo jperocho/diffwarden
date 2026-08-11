@@ -1,7 +1,7 @@
 ---
 name: diffwarden
 description: "Review deeply. Fix safely. Report briefly. Work anywhere — PRs, git workspaces, non-git folders, and documents. Inspect diffs or files, classify findings, fix safe issues, verify, and loop until ready. Supports /diffwarden and /dw slash commands in Claude Code, Cursor, and Pi Agent; Codex CLI uses $diffwarden or /skills."
-version: 0.28.0
+version: 0.28.1
 author: jperocho
 license: MIT
 metadata:
@@ -242,7 +242,7 @@ Score:
 - `2/5`: P1 or failing required check.
 - `0-1/5`: P0/security/data-loss/auth-bypass/hard build failure.
 
-Safety caps: unresolved P0/security -> `1/5`; failing terminal required check -> `2/5`; pending required check -> `3/5`; needs-user -> `3/5`. Stamp verbose/posted score with head SHA and check state. Local/document score uses `checks: n/a`.
+Safety caps: unresolved P0/security -> `1/5`; failing terminal required check -> `2/5`; pending required check -> `3/5`; needs-user -> `3/5`. In verbose/posted output, stamp head SHA and check state on a `Head:` line immediately before the final `Status:` and `Level:` lines. Local/document score uses `checks: n/a`.
 
 ## Fix planning and edits
 
@@ -335,6 +335,8 @@ Status: ready | not-ready | blocked | user decision needed
 Level: N/5
 ```
 
+This two-line contract is mandatory and literal. Pi/master/orchestration wrappers, section headings, or outer review structures do not replace it — every review/loop/status/comment must still end with these exact two lines as the final output, regardless of wrapper context.
+
 Loop: one `cN/5` line per iteration, blank, then `Status:` and `Level:`.
 
 Review:
@@ -363,8 +365,9 @@ Risks:
 Sources:          # --web only
 Next action:
 How to test:      # code loop changes only
+Head: <head-sha> (checks: passing | pending | failing | n/a)
 Status: ready | not-ready | blocked | user decision needed
-Level: N/5 @ <head-sha> (checks: passing | pending | failing | n/a)
+Level: N/5
 ```
 
 How-to-test only when code changed and verbose/posting; every path/command/expected output must be grounded in evidence or omitted.
@@ -375,12 +378,13 @@ Caveman style: if caveman mode active, compress wording further but keep paths, 
 
 Posting requires PR mode, explicit flag/subcommand, explicit user approval for this run, head SHA recheck, dedupe, and `COMMENT` only. Never approve, request changes, merge, push, or resolve as part of posting unless separately authorized.
 
-`comment` or `review --comment`: short summary + optional inline P comments on changed lines. Prefix automated review. Stamp head SHA on `Level:`:
+`comment` or `review --comment`: short summary + optional inline P comments on changed lines. Prefix automated review. Stamp head SHA on a `Head:` line before the final two lines:
 
 ```text
 Findings: <short summary>
+Head: <head-sha>
 Status: ready | not-ready
-Level: N/5 @ <head-sha>
+Level: N/5
 ```
 
 Inline comments:
@@ -478,4 +482,4 @@ Grounding sources: diff/changed files, file reads, actual command output, discov
 - Fixes scoped/safe; no forbidden git/destructive/security-weakening action.
 - Verification grounded; failures reported honestly.
 - Posting/reply/resolve only with approval and head recheck.
-- Lean output ends with `Status:` then `Level:`.
+- Lean output ends with `Status:` then `Level:` as the final two lines; Pi/master/orchestration wrappers do not substitute for them.

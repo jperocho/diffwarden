@@ -112,7 +112,12 @@ Even in orchestration mode, output remains lean. Subagent transcripts are not pr
 c2/5 P1 src/auth.ts:44 — missing ownership check
 c3/5 P2 tests missing for changed branch
 c5/5 clean
+
+Status: ready
+Level: 5/5
 ```
+
+Orchestrators and master reviewers must append `Status:` then `Level:` as the final two lines of every review/loop/status/comment output — even when wrapping Diffwarden in a broader review structure.
 
 Use `--verbose` for the full detailed report.
 
